@@ -3,6 +3,7 @@
 Updated: 2026-10-17 (step 3: CREAO plumbing + seed)
 
 Works:
+- **Deployed:** https://care-call-production.up.railway.app (Railway, `server/Dockerfile`, SQLite on a volume at `/data`). Device token: ask Anay (DM only).
 - `server/` FastAPI. Run from repo root: `server/.venv/bin/python3 -m uvicorn server.main:app --port 8000` (venv is Python 3.12; `pip install -r server/requirements.txt`). API page at `/docs`.
 - Every contract section 9 route exists. Errors are `{"error": "..."}`. CORS open.
 - SQLite (`server/carecall.db`, gitignored; override with `DB_PATH`): samples, requests, device heartbeats and ack display state survive restarts.
@@ -20,8 +21,7 @@ Stubs:
 
 Blocked / need:
 - Photon from a Python server: decide how to send (small Node sidecar would be a new runtime, needs a contract change).
-- Not deployed yet.
 
 Next:
-- Deploy (by 5:15 PM), then Photon bridge, TTS, Sentry.
+- Photon bridge, TTS, Sentry.
 - Needs Rey's `integrations/creao.py` to make adapt runs real.
