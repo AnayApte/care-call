@@ -1,13 +1,27 @@
 """Care Call server. Run from the repo root: python3 -m uvicorn server.main:app"""
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from . import db, escalation
 from .routes import adapt, device, health, misc, patients, requests
 
-app = FastAPI(title="Care Call server")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s %(message)s")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init()
+    escalation.resume_all()
+    yield
+
+
+app = FastAPI(title="Care Call server", lifespan=lifespan)
 
 # The web app (Vercel) and /beacon call us from other origins. No cookies, so * is fine.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

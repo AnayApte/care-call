@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from .. import store
+from .. import escalation, store
 from ..deps import get_patient
 from ..models import AckIn, FeedbackIn, RequestIn
 
@@ -16,7 +16,9 @@ def create_request(body: RequestIn):
     labels = {w["label"] for w in patient["vocabulary"]}
     if body.label not in labels:
         raise HTTPException(422, f"label must be one of {sorted(labels)} (never neutral)")
-    return store.create_request(body.patient_id, body.label, body.confidence, body.source)
+    req = store.create_request(body.patient_id, body.label, body.confidence, body.source)
+    escalation.start(req)
+    return req
 
 
 @router.get("")

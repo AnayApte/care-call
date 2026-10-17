@@ -1,21 +1,23 @@
 # Status: anay
 
-Updated: 2026-10-17 (step 1: server skeleton)
+Updated: 2026-10-17 (step 2: SQLite, escalation, acks)
 
 Works:
-- `server/` FastAPI skeleton. Run from repo root: `server/.venv/bin/python3 -m uvicorn server.main:app --port 8000` (venv is Python 3.12; `pip install -r server/requirements.txt`).
-- Every contract section 9 route exists and returns fixture-shaped JSON. Errors are `{"error": "..."}`. CORS open for the web app.
-- `/health`, `/api/device/health` (503 if no heartbeat in 15 s).
-- ESP32 routes check `X-Device-Token` (401 if wrong, 503 if the server has no `DEVICE_TOKEN`).
-- Request create/list/ack, device state idle -> alert -> acked (5 s, "On the way") -> idle, button ack, samples CRUD.
+- `server/` FastAPI. Run from repo root: `server/.venv/bin/python3 -m uvicorn server.main:app --port 8000` (venv is Python 3.12; `pip install -r server/requirements.txt`). API page at `/docs`.
+- Every contract section 9 route exists. Errors are `{"error": "..."}`. CORS open.
+- SQLite (`server/carecall.db`, gitignored; override with `DB_PATH`): samples, requests, device heartbeats and ack display state survive restarts.
+- Escalation timer (`server/escalation.py`): iMessage step at `ESCALATE_MESSAGE_AFTER_S` (if `ENABLE_PHOTON`), call step at `ESCALATE_CALL_AFTER_S` (if `ENABLE_PHONE_CALL`). Ack stops it; a step can only ever run once; open requests resume their timers after a restart.
+- Ack from the button (`/api/device/ack`) and dashboard (`/api/requests/{id}/ack`): sets `acked`, `ack_latency_ms`, device shows `acked` / "On the way" for 5 s.
+- Device routes check `X-Device-Token`; `/api/device/health` 503 with no heartbeat in 15 s.
 
-Stubs (for now):
-- State is in memory (lost on restart). SQLite comes in step 2.
-- No escalation timer yet (step 2). `/api/tts` returns 501. Photon webhook accepts and ignores.
-- CREAO routes: `/api/adapt/run` returns `{"job_id":"stub"}`, `/api/adapt/{id}` always returns `failed` with no proposal. Sessions/feedback are accepted but not stored.
+Stubs:
+- `integrations/photon.py` only logs. Photon sends only through its TypeScript SDK (`spectrum-ts`); no HTTP send endpoint found. Needs a decision (see below).
+- Call step needs Rey's `integrations/telephony.py` with `place_call(request: dict)`; skipped with a warning until then (not in the contract yet).
+- `/api/tts` 501. CREAO routes still stubs (step 3).
 
 Blocked / need:
-- Not deployed yet (Railway/Render).
+- Photon from a Python server: decide how to send (small Node sidecar would be a new runtime, needs a contract change).
+- Not deployed yet.
 
 Next:
-- Step 2: SQLite storage, escalation timer, acks.
+- Step 3: CREAO plumbing and `server/seed.py`.

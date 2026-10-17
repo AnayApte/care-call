@@ -1,18 +1,11 @@
-"""Server state. Step 1: in memory. Step 2 moves this to SQLite behind the same functions."""
-import threading
+"""Server state in SQLite. Routes and the escalation timer only talk to these functions."""
+import json
 import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from . import config
+from . import config, db
 from .models import PATIENTS
-
-_lock = threading.Lock()
-_samples: list[dict] = []
-_requests: list[dict] = []
-_heartbeats: dict[str, dict] = {}  # device_id -> {"at": monotonic, "rssi": int}
-_acked_until: dict[str, tuple[float, dict]] = {}  # device_id -> (monotonic deadline, request)
-_counter = {"s": 0, "r": 0}
 
 
 def now_iso() -> str:
@@ -20,109 +13,150 @@ def now_iso() -> str:
 
 
 def parse_iso(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def _next_id(kind: str) -> str:
-    _counter[kind] += 1
-    return f"{kind}_{_counter[kind]}"
+def _n(public_id: str, prefix: str) -> Optional[int]:
+    """'r_12' -> 12. Anything else -> None."""
+    head, _, num = public_id.partition("_")
+    return int(num) if head == prefix and num.isdigit() else None
 
 
 # Samples
 
+def _sample(row) -> dict:
+    return {"id": f"s_{row['n']}", "patient_id": row["patient_id"], "label": row["label"],
+            "vector": json.loads(row["vector"]), "created_at": row["created_at"]}
+
+
 def list_samples(patient_id: str) -> list[dict]:
-    with _lock:
-        return [s for s in _samples if s["patient_id"] == patient_id]
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM samples WHERE patient_id=? ORDER BY n", (patient_id,)).fetchall()
+    return [_sample(r) for r in rows]
 
 
 def add_sample(patient_id: str, label: str, vector: list[float]) -> dict:
-    with _lock:
-        sample = {"id": _next_id("s"), "patient_id": patient_id, "label": label,
-                  "vector": vector, "created_at": now_iso()}
-        _samples.append(sample)
-        return sample
+    with db.connect() as conn:
+        cur = conn.execute("INSERT INTO samples (patient_id, label, vector, created_at) VALUES (?,?,?,?)",
+                           (patient_id, label, db.dumps(vector), now_iso()))
+        row = conn.execute("SELECT * FROM samples WHERE n=?", (cur.lastrowid,)).fetchone()
+    return _sample(row)
 
 
 def delete_samples(patient_id: str) -> int:
-    with _lock:
-        before = len(_samples)
-        _samples[:] = [s for s in _samples if s["patient_id"] != patient_id]
-        return before - len(_samples)
+    with db.connect() as conn:
+        return conn.execute("DELETE FROM samples WHERE patient_id=?", (patient_id,)).rowcount
 
 
 # Requests
 
+def _request(row) -> dict:
+    return {"id": f"r_{row['n']}", "patient_id": row["patient_id"], "label": row["label"],
+            "display": row["display"], "speech": row["speech"], "confidence": row["confidence"],
+            "source": row["source"], "status": row["status"], "escalation_level": row["escalation_level"],
+            "created_at": row["created_at"], "acked_at": row["acked_at"], "acked_by": row["acked_by"],
+            "ack_latency_ms": row["ack_latency_ms"]}
+
+
 def create_request(patient_id: str, label: str, confidence: float, source: str) -> dict:
     word = next(w for w in PATIENTS[patient_id]["vocabulary"] if w["label"] == label)
-    with _lock:
-        req = {"id": _next_id("r"), "patient_id": patient_id, "label": label,
-               "display": word["display"], "speech": word["speech"],
-               "confidence": confidence, "source": source, "status": "open",
-               "escalation_level": 0, "created_at": now_iso(),
-               "acked_at": None, "acked_by": None, "ack_latency_ms": None}
-        _requests.append(req)
-        return dict(req)
+    with db.connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO requests (patient_id, label, display, speech, confidence, source, created_at)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (patient_id, label, word["display"], word["speech"], confidence, source, now_iso()))
+        row = conn.execute("SELECT * FROM requests WHERE n=?", (cur.lastrowid,)).fetchone()
+    return _request(row)
 
 
 def get_request(request_id: str) -> Optional[dict]:
-    with _lock:
-        for r in _requests:
-            if r["id"] == request_id:
-                return dict(r)
-    return None
+    n = _n(request_id, "r")
+    if n is None:
+        return None
+    with db.connect() as conn:
+        row = conn.execute("SELECT * FROM requests WHERE n=?", (n,)).fetchone()
+    return _request(row) if row else None
 
 
 def list_requests(patient_id: Optional[str] = None, since: Optional[datetime] = None) -> list[dict]:
-    with _lock:
-        rows = [dict(r) for r in _requests
-                if (patient_id is None or r["patient_id"] == patient_id)
-                and (since is None or parse_iso(r["created_at"]) > since)]
-    return sorted(rows, key=lambda r: r["created_at"], reverse=True)
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM requests WHERE (? IS NULL OR patient_id=?) ORDER BY n DESC",
+                            (patient_id, patient_id)).fetchall()
+    out = [_request(r) for r in rows]
+    if since is not None:
+        out = [r for r in out if parse_iso(r["created_at"]) > since]
+    return out
+
+
+def open_requests() -> list[dict]:
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM requests WHERE status='open' ORDER BY n DESC").fetchall()
+    return [_request(r) for r in rows]
 
 
 def latest_open_request() -> Optional[dict]:
-    open_rows = [r for r in list_requests() if r["status"] == "open"]
-    return open_rows[0] if open_rows else None
+    rows = open_requests()
+    return rows[0] if rows else None
 
 
 def ack_request(request_id: str, by: str) -> Optional[dict]:
-    """Ack an open request. Returns the request, or None if not found. Acking twice is a no-op."""
-    with _lock:
-        req = next((r for r in _requests if r["id"] == request_id), None)
-        if req is None:
+    """Ack an open request. Returns the request, or None if not found. Acking twice changes nothing."""
+    n = _n(request_id, "r")
+    if n is None:
+        return None
+    with db.connect() as conn:
+        row = conn.execute("SELECT * FROM requests WHERE n=?", (n,)).fetchone()
+        if row is None:
             return None
-        if req["status"] == "open":
+        if row["status"] == "open":
             acked_at = datetime.now(timezone.utc)
-            req["status"] = "acked"
-            req["acked_at"] = now_iso()
-            req["acked_by"] = by
-            req["ack_latency_ms"] = int((acked_at - parse_iso(req["created_at"])).total_seconds() * 1000)
-            deadline = time.monotonic() + config.ACKED_DISPLAY_S
-            _acked_until[config.DEFAULT_DEVICE_ID] = (deadline, dict(req))
-        return dict(req)
+            latency = int((acked_at - parse_iso(row["created_at"])).total_seconds() * 1000)
+            conn.execute("UPDATE requests SET status='acked', acked_at=?, acked_by=?, ack_latency_ms=?"
+                         " WHERE n=? AND status='open'", (now_iso(), by, latency, n))
+            conn.execute("INSERT INTO devices (device_id, acked_request_n, acked_until) VALUES (?,?,?)"
+                         " ON CONFLICT(device_id) DO UPDATE SET acked_request_n=excluded.acked_request_n,"
+                         " acked_until=excluded.acked_until",
+                         (config.DEFAULT_DEVICE_ID, n, time.time() + config.ACKED_DISPLAY_S))
+            row = conn.execute("SELECT * FROM requests WHERE n=?", (n,)).fetchone()
+    return _request(row)
+
+
+def claim_escalation(request_id: str, level: int) -> bool:
+    """Move an open request up to `level`. True only for the one caller that did it (idempotency)."""
+    n = _n(request_id, "r")
+    with db.connect() as conn:
+        cur = conn.execute("UPDATE requests SET escalation_level=?"
+                           " WHERE n=? AND status='open' AND escalation_level<?", (level, n, level))
+        return cur.rowcount == 1
 
 
 # Device
 
 def record_heartbeat(device_id: str, rssi: Optional[int]) -> None:
-    with _lock:
-        _heartbeats[device_id] = {"at": time.monotonic(), "rssi": rssi}
+    with db.connect() as conn:
+        conn.execute("INSERT INTO devices (device_id, last_heartbeat_at, rssi) VALUES (?,?,?)"
+                     " ON CONFLICT(device_id) DO UPDATE SET last_heartbeat_at=excluded.last_heartbeat_at,"
+                     " rssi=excluded.rssi", (device_id, time.time(), rssi))
 
 
 def last_heartbeat_age_s() -> Optional[float]:
-    with _lock:
-        if not _heartbeats:
-            return None
-        return time.monotonic() - max(h["at"] for h in _heartbeats.values())
+    with db.connect() as conn:
+        row = conn.execute("SELECT MAX(last_heartbeat_at) AS t FROM devices").fetchone()
+    return None if row["t"] is None else time.time() - row["t"]
 
 
 def device_state(device_id: str) -> dict:
-    with _lock:
-        acked = _acked_until.get(config.DEFAULT_DEVICE_ID)  # one beacon for the demo
-    if acked and acked[0] > time.monotonic():
-        req = acked[1]
+    with db.connect() as conn:
+        # One beacon for the demo: acks are recorded on the default device.
+        dev = conn.execute("SELECT * FROM devices WHERE device_id=?", (config.DEFAULT_DEVICE_ID,)).fetchone()
+        acked = None
+        if dev and dev["acked_until"] and dev["acked_until"] > time.time():
+            acked = conn.execute("SELECT * FROM requests WHERE n=?", (dev["acked_request_n"],)).fetchone()
+    if acked:
         return {"device_id": device_id, "mode": "acked",
-                "active_request": {"id": req["id"], "display": req["display"], "created_at": req["created_at"]},
+                "active_request": {"id": f"r_{acked['n']}", "display": acked["display"],
+                                   "created_at": acked["created_at"]},
                 "message": config.ACKED_MESSAGE}
     req = latest_open_request()
     if req:
