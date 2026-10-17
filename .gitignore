@@ -16,3 +16,4 @@ server/cache/
 *.pt
 *.onnx
 *.tflite
+ml/data/
