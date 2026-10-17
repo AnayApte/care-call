@@ -1,0 +1,8 @@
+torch==2.14.1  # install with: pip install torch --index-url https://download.pytorch.org/whl/cpu
+numpy==2.5.4
+scikit-learn==1.9.1
+matplotlib==3.11.2
+
+# optional, only for ml/camera_test.py (local webcam demo)
+# mediapipe==1.1.1
+# opencv-python==5.0.0
