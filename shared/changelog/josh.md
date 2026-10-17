@@ -9,3 +9,5 @@
 2026-10-17 | Shortened the README and status notes to make setup and next steps easier to follow.
 
 2026-10-17 16:19 | Added guided arm movement demo, HELP alert, device status and browser acknowledgement preview for Josh's updated goal. Simulated flow and 31 checks passed. Live camera and real hardware still need testing.
+
+2026-10-17 | Clarified that the real ESP32 needs the public server URL; localhost is only for laptop testing.
