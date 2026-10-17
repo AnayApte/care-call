@@ -8,60 +8,64 @@ embedding, not a model of post-stroke movement. Assistive prototype, not a medic
 
 | metric | value |
 | --- | --- |
-| validation accuracy | 0.9489 |
-| train hands | 54956 |
-| validation hands | 13044 |
-| unique users (train) | 13100 |
-| unique users (val) | 3193 |
-| training time | 8.9 s |
-| epochs run | 40 |
+| validation accuracy | 0.9516 |
+| train hands | 1052724 |
+| validation hands | 255628 |
+| unique users (train) | 51543 |
+| unique users (val) | 12613 |
+| training time | 92.9 s |
+| epochs run | 57 |
+| augmentation | True |
 
 The split is by `user_id` (sha256 hash, 80/20), so no person appears in both sets.
-Confusion matrix: `confusion.png`.
+Confusion matrix: `confusion.png`. Few-shot transfer numbers and ablations: `experiments.md`.
 
 ## Per-class validation accuracy
 
 | class | n_val | accuracy |
 | --- | --- | --- |
-| call | 369 | 0.981 |
-| dislike | 365 | 0.989 |
-| fist | 380 | 0.992 |
-| four | 376 | 0.997 |
-| grabbing | 327 | 0.982 |
-| grip | 370 | 0.978 |
-| hand_heart | 380 | 0.950 |
-| hand_heart2 | 337 | 0.875 |
-| holy | 339 | 0.912 |
-| like | 419 | 0.983 |
-| little_finger | 397 | 0.997 |
-| middle_finger | 420 | 0.967 |
-| mute | 373 | 0.952 |
-| neutral | 427 | 0.934 |
-| ok | 399 | 0.982 |
-| one | 377 | 0.934 |
-| palm | 366 | 0.986 |
-| peace | 392 | 0.985 |
-| peace_inverted | 397 | 0.982 |
-| point | 377 | 0.952 |
-| rock | 378 | 0.989 |
-| stop | 375 | 0.989 |
-| stop_inverted | 368 | 0.978 |
-| take_picture | 374 | 0.912 |
-| three | 379 | 0.976 |
-| three2 | 392 | 0.990 |
-| three3 | 355 | 0.986 |
-| three_gun | 368 | 0.992 |
-| thumb_index | 610 | 0.898 |
-| thumb_index2 | 377 | 0.528 |
-| timeout | 353 | 0.847 |
-| two_up | 376 | 0.987 |
-| two_up_inverted | 358 | 0.983 |
-| xsign | 394 | 0.911 |
+| call | 5272 | 0.986 |
+| dislike | 5919 | 0.987 |
+| fist | 5856 | 0.987 |
+| four | 6004 | 0.995 |
+| grabbing | 6560 | 0.977 |
+| grip | 6481 | 0.969 |
+| hand_heart | 10009 | 0.957 |
+| hand_heart2 | 6215 | 0.867 |
+| holy | 8488 | 0.948 |
+| like | 5838 | 0.988 |
+| little_finger | 6680 | 0.990 |
+| middle_finger | 7550 | 0.977 |
+| mute | 5987 | 0.963 |
+| neutral | 36153 | 0.969 |
+| ok | 5959 | 0.991 |
+| one | 5967 | 0.931 |
+| palm | 6054 | 0.987 |
+| peace | 5892 | 0.982 |
+| peace_inverted | 5549 | 0.974 |
+| point | 6335 | 0.951 |
+| rock | 6105 | 0.990 |
+| stop | 5761 | 0.987 |
+| stop_inverted | 5788 | 0.984 |
+| take_picture | 7849 | 0.908 |
+| three | 5724 | 0.982 |
+| three2 | 5657 | 0.993 |
+| three3 | 7493 | 0.990 |
+| three_gun | 6940 | 0.995 |
+| thumb_index | 13875 | 0.840 |
+| thumb_index2 | 6922 | 0.670 |
+| timeout | 5165 | 0.817 |
+| two_up | 5845 | 0.990 |
+| two_up_inverted | 5572 | 0.977 |
+| xsign | 8164 | 0.941 |
 
 ## Model
 
-MLP `42 -> 64 -> 32 -> 34`, ReLU, dropout 0.2 during training only, Adam lr 1e-3,
-batch 64, up to 40 epochs, early stopping (patience 5 on validation accuracy), seed 42.
+MLP `42 -> 64 -> 32 -> 34`, ReLU, dropout 0.2 during training only, Adam lr 0.001
+halved after 3 epochs without improvement, batch 512, up to 100 epochs,
+early stopping (patience 10 on validation accuracy), seed 42.
+Training augmentation (`augment.py`): per-hand random rotation, scale and gaussian jitter on the
+raw landmarks, to stand in for weak, shaky or partially closed hands.
 Inputs are standardised with the training mean and std, both stored in `baseline.json`.
 The 32-float output of the second ReLU (`embedding_layer: 1`) is the embedding the browser
 uses for the personal kNN. `embed.py` is the numpy reference implementation.
@@ -76,8 +80,11 @@ uses for the personal kNN. `embed.py` is the numpy reference implementation.
    The browser must apply the identical rule before calling the model.
 4. Flatten to 42 floats in `x0, y0, x1, y1, ...` order.
 
-Hands without landmarks or without exactly 21 points were skipped. Each class was capped
-at 2000 hands sampled with seed 42. `no_gesture` was renamed `neutral`.
+Note: this differs from contract section 8 (max distance from wrist, no mirror). Kept on
+purpose for testing; see `shared/CONTRACT_REQUESTS.md` before shipping.
+
+Hands without landmarks or without exactly 21 points were skipped. Every hand in the
+annotations is used (no per-class cap). `no_gesture` was renamed `neutral`.
 
 ## Dataset
 
