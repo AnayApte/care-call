@@ -1,6 +1,6 @@
 # Status: anay
 
-Updated: 2026-10-17 (step 3: CREAO plumbing + seed)
+Updated: 2026-10-17 ~5 PM (Photon iMessage working)
 
 Works:
 - **Deployed:** https://care-call-production.up.railway.app (Railway, `server/Dockerfile`, SQLite on a volume at `/data`). Device token: ask Anay (DM only).
@@ -14,14 +14,18 @@ Works:
 - Never invents a proposal: crash, bad shape, `done` with no proposal, CREAO off or `creao.py` missing all give `failed` (run returns 503/502 `{"error"}`).
 - `server/seed.py`: 4 synthetic sessions for Maria ("pain" flaky, often confused with "help"). Run `server/.venv/bin/python3 -m server.seed`; rerunning replaces only the seed.
 
+- **Photon iMessage (tested live on a real phone):** at 20 s the caregiver gets a text plus an iMessage poll (On my way / Can't come). Tapping On my way or replying 1 / ok / ack / on my way acks with `by:"imessage"`. "status" lists open requests. Ack from button or dashboard after the text sends an "Update: ... answered" message. Only `CAREGIVER_PHONE` numbers (comma separated) are listened to.
+- `server/photon-bridge/`: Node + spectrum-ts sidecar (Photon has no HTTP send API). Python talks to it on 127.0.0.1:8787 with `X-Bridge-Secret` (defaults to `DEVICE_TOKEN`). `server/start.sh` runs it in the same Railway container when `ENABLE_PHOTON=true`.
+
 Stubs:
-- `integrations/photon.py` only logs. Photon sends only through its TypeScript SDK (`spectrum-ts`); no HTTP send endpoint found. Needs a decision (see below).
+- Free-text iMessage questions get a help reply until Gemini is wired.
 - Call step needs Rey's `integrations/telephony.py` with `place_call(request: dict)`; skipped with a warning until then (not in the contract yet).
 - `/api/tts` 501. Handoff report (optional extra) returns 501.
 
 Blocked / need:
-- Photon from a Python server: decide how to send (small Node sidecar would be a new runtime, needs a contract change).
+- Contract PR: photon-bridge line, PHOTON_* names, telephony interface, small API details.
+- Railway: add PHOTON_PROJECT_ID, PHOTON_PROJECT_SECRET, CAREGIVER_PHONE, ENABLE_PHOTON=true.
 
 Next:
-- Photon bridge, TTS, Sentry.
+- TTS (ElevenLabs), Sentry, Gemini for free-text iMessage.
 - Needs Rey's `integrations/creao.py` to make adapt runs real.
