@@ -44,6 +44,7 @@ async function send(to: string[], text: string, requestId?: string, pollTitle?: 
     if (pollTitle) {
       const sent = await dm.send(poll(pollTitle, ACK_OPTION, DECLINE_OPTION));
       if (sent && requestId) pollRequests.set(sent.id, requestId);
+      console.log("[bridge] poll sent", JSON.stringify({ id: sent?.id, requestId }));
     }
   }
 }
@@ -87,8 +88,15 @@ async function forward(from: string, text: string, requestId?: string): Promise<
 // Inbound messages and poll taps -> server. One bad message never stops the loop.
 for await (const [space, message] of app.messages) {
   try {
-    if (message.direction !== "inbound" || !message.sender) continue;
+    if (message.direction !== "inbound" || !message.sender) {
+      console.log("[bridge] skipped", message.direction, message.content.type, message.sender ? "" : "(no sender)");
+      continue;
+    }
     const c = message.content;
+    // One line per inbound event so we can see what poll taps look like in the Railway logs.
+    console.log("[bridge] inbound", JSON.stringify({ type: c.type, from: message.sender.id,
+      selected: (c as any).selected, option: (c as any).option?.title,
+      guid: (c as any).pollMessageGuid ?? (c as any).poll?.pollMessageGuid, known: pollRequests.size }));
     let answer: string | undefined;
     if (c.type === "text") {
       answer = await forward(message.sender.id, c.text);
