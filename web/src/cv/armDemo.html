@@ -47,6 +47,7 @@
       <input id="alert-server" type="url" value="http://127.0.0.1:8000" spellcheck="false">
       <p><label><input id="enable-device" type="checkbox"> Send HELP to this server when movement is flagged</label></p>
       <p class="small">Uses synthetic demo patient Maria. The ESP32 must use the same server and have Alex's firmware running. A simulated drop can also send an alert when enabled.</p>
+      <p class="small">Localhost is for this laptop's preview. For the real ESP32, use a public HTTPS server URL that both devices can reach.</p>
       <button id="server-check">Check server and device</button>
       <p id="device-status" role="status">Device connection not checked.</p>
       <p id="alert-status" role="status">Preview only. No alert sent.</p>
