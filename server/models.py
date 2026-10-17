@@ -1,7 +1,7 @@
 """Wire shapes from contract section 8 and request bodies from section 9."""
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 PATIENT = {
     "id": "p_demo",
@@ -59,6 +59,56 @@ class TtsIn(BaseModel):
 
 class FeedbackIn(BaseModel):
     correct: bool
+
+
+class LabelStats(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    attempts: int = Field(ge=0)
+    fired: int = Field(ge=0)
+    abandoned: int = Field(ge=0)
+    mean_conf: Optional[float] = None
+    min_conf: Optional[float] = None
+    mean_hold_frames_to_fire: Optional[float] = None
+
+
+class Confusion(BaseModel):
+    intended: str
+    predicted: str
+    count: int = Field(ge=0)
+
+
+class SessionIn(BaseModel):
+    """Gesture session summary from web/src/cv/session.ts (contract section 19)."""
+    model_config = ConfigDict(extra="allow")
+    patient_id: str
+    started_at: str
+    ended_at: str
+    config_version: int = 1
+    labels: dict[str, LabelStats] = {}
+    confusions: list[Confusion] = []
+    false_triggers_neutral: int = Field(default=0, ge=0)
+
+
+class LabelOverride(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    min_confidence: Optional[float] = None
+    hold_frames: Optional[int] = None
+
+
+class SuggestReplace(BaseModel):
+    label: str
+    reason: str = ""
+
+
+class AdaptConfigIn(BaseModel):
+    """Types only. The browser (web/src/cv/adapt.ts) clamps the values."""
+    model_config = ConfigDict(extra="allow")
+    version: int
+    hold_frames: int
+    min_confidence: float
+    labels: dict[str, LabelOverride] = {}
+    retrain_labels: list[str] = []
+    suggest_replace: list[SuggestReplace] = []
 
 
 class AdaptRunIn(BaseModel):

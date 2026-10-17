@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from .. import config
 from ..models import TtsIn
@@ -12,12 +12,6 @@ router = APIRouter()
 def tts(body: TtsIn):
     # Step 1 stub: ElevenLabs comes in a later step.
     raise HTTPException(501, "tts not implemented yet")
-
-
-@router.post("/api/webhooks/photon")
-async def photon_webhook(request: Request):
-    # Step 1 stub: accept and ignore until Photon is wired.
-    return {"ok": True, "handled": False}
 
 
 @router.get("/api/benchmark")

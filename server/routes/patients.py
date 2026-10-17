@@ -2,12 +2,9 @@ from fastapi import APIRouter, Depends
 
 from .. import store
 from ..deps import get_patient
-from ..models import DEFAULT_ADAPT_CONFIG, SampleIn
+from ..models import AdaptConfigIn, SampleIn
 
 router = APIRouter(prefix="/api/patients")
-
-# Step 1 stub: approved configs live in memory until step 3.
-_adapt_configs: dict[str, dict] = {}
 
 
 @router.get("/{patient_id}")
@@ -32,10 +29,10 @@ def reset_samples(p: dict = Depends(get_patient)):
 
 @router.get("/{patient_id}/adapt-config")
 def get_adapt_config(p: dict = Depends(get_patient)):
-    return _adapt_configs.get(p["id"], DEFAULT_ADAPT_CONFIG)
+    return store.get_adapt_config(p["id"])
 
 
 @router.put("/{patient_id}/adapt-config")
-def put_adapt_config(body: dict, p: dict = Depends(get_patient)):
-    _adapt_configs[p["id"]] = body
-    return body
+def put_adapt_config(body: AdaptConfigIn, p: dict = Depends(get_patient)):
+    """Called only when the caregiver taps Apply."""
+    return store.set_adapt_config(p["id"], body.model_dump())

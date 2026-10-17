@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import config, store
+from .. import config, escalation, store
 from ..deps import require_device_token
 from ..models import DeviceAckIn, HeartbeatIn
 
@@ -17,7 +17,7 @@ def ack(body: DeviceAckIn):
     req = store.latest_open_request()
     if req is None:
         raise HTTPException(409, "no open request to acknowledge")
-    return store.ack_request(req["id"], "button")
+    return escalation.acknowledge(req["id"], "button")
 
 
 @router.post("/heartbeat")

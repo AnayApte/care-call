@@ -38,6 +38,25 @@ CREATE TABLE IF NOT EXISTS devices (
     acked_request_n INTEGER,
     acked_until REAL
 );
+CREATE TABLE IF NOT EXISTS cv_sessions (
+    n INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    synthetic INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS feedback (
+    n INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_n INTEGER NOT NULL,
+    patient_id TEXT NOT NULL,
+    correct INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS adapt_configs (
+    patient_id TEXT PRIMARY KEY,
+    config TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
