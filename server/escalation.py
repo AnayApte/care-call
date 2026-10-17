@@ -9,6 +9,7 @@ store.claim_escalation lets only one caller ever run a step, so nothing is sent 
 import logging
 import threading
 from datetime import datetime, timezone
+from typing import Optional
 
 from . import config, store
 from .integrations import photon
@@ -17,7 +18,8 @@ log = logging.getLogger("carecall.escalation")
 
 
 def _message_text(req: dict) -> str:
-    return f"Maria needs: {req['display']}. \"{req['speech']}\" Reply 1 to acknowledge."
+    return (f"Maria needs: {req['display']}. \"{req['speech']}\"\n"
+            "Nobody has answered the bedside alert yet. Tap On my way below, or reply 1.")
 
 
 def _send_message(request_id: str) -> None:
@@ -27,7 +29,7 @@ def _send_message(request_id: str) -> None:
     if store.claim_escalation(request_id, 1):
         log.info("escalation.message %s", request_id)
         try:
-            photon.send_message(_message_text(req))
+            photon.send_message(_message_text(req), req["id"], f"Maria needs: {req['display']}")
         except Exception:
             log.exception("escalation.message failed for %s", request_id)
 
@@ -48,6 +50,17 @@ def _place_call(request_id: str) -> None:
             telephony.place_call(req)
         except Exception:
             log.exception("escalation.call failed for %s", request_id)
+
+
+def acknowledge(request_id: str, by: str) -> Optional[dict]:
+    """Ack from any channel. If the caregiver was already texted, tell them it is handled."""
+    before = store.get_request(request_id)
+    req = store.ack_request(request_id, by)
+    if before and req and before["status"] == "open" and req["escalation_level"] >= 1 and by != "imessage":
+        seconds = round((req["ack_latency_ms"] or 0) / 1000)
+        text = f"Update: {req['display']} was answered ({by}) after {seconds} s. No need to come."
+        threading.Thread(target=photon.send_message, args=(text,), daemon=True).start()
+    return req
 
 
 def _after(seconds: float, fn, request_id: str) -> None:

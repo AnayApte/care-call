@@ -34,7 +34,7 @@ def list_requests(patient_id: Optional[str] = None, since: Optional[str] = None)
 
 @router.post("/{request_id}/ack")
 def ack(request_id: str, body: AckIn):
-    req = store.ack_request(request_id, body.by)
+    req = escalation.acknowledge(request_id, body.by)
     if req is None:
         raise HTTPException(404, f"unknown request {request_id}")
     return req
