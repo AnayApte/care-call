@@ -40,9 +40,9 @@ def ack(request_id: str, body: AckIn):
     return req
 
 
-@router.post("/{request_id}/feedback")
+@router.post("/{request_id}/feedback", status_code=201)
 def feedback(request_id: str, body: FeedbackIn):
-    # Step 1 stub: stored for real in step 3.
-    if store.get_request(request_id) is None:
+    fb = store.add_feedback(request_id, body.correct)
+    if fb is None:
         raise HTTPException(404, f"unknown request {request_id}")
-    return {"request_id": request_id, "correct": body.correct}
+    return fb
