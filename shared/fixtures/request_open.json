@@ -1,0 +1,1 @@
+{"id":"r_1","patient_id":"p_demo","label":"water","display":"Water","speech":"I would like some water, please.","confidence":0.91,"source":"browser","status":"open","escalation_level":0,"created_at":"2026-10-17T15:00:00Z","acked_at":null,"acked_by":null,"ack_latency_ms":null}

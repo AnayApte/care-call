@@ -1,0 +1,5 @@
+{"id":"p_demo","name":"Maria","vocabulary":[
+ {"label":"water","display":"Water","speech":"I would like some water, please."},
+ {"label":"pain","display":"Pain","speech":"I am in pain. Please come."},
+ {"label":"help","display":"Help","speech":"I need help. Please come."},
+ {"label":"bathroom","display":"Bathroom","speech":"I need to use the bathroom."}]}
