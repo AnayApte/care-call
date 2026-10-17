@@ -3,15 +3,16 @@
 Updated: 2026-10-17
 
 Works:
-- Hand tracking and three-second sample capture.
-- Rey's model connected to personal gesture training.
-- Hold check, cooldown and local request preview.
-- 18 tests, TypeScript check and demo build passed.
+- New guided arm demo at web/src/cv/armDemo.html, following Josh's updated goal.
+- Observes sustained arm lowering; lost tracking gives an incomplete result.
+- Sends one HELP alert through the existing server and watches for acknowledgement.
+- Browser beacon preview works. Simulated drop -> HELP -> acknowledgement tested.
+- 29 JavaScript tests, two server checks, TypeScript check and demo build passed.
 
 Next:
-- Josh: test with the webcam and fresh poses.
-- Rey: connect the patient page to the server.
-- Alex: check that the Pi uses the same hand-data format.
-- Collect teammate examples for the benchmark.
+- Josh: test the new demo with a live camera.
+- Alex: run the ESP32 firmware against the same server and test its buzzer/display.
+- Anay: update the shared plan for Josh's new goal and agree a richer observation format.
 
-The demo displays requests locally. Live webcam performance is not yet verified.
+Arm thresholds are unvalidated demo settings. This cannot diagnose or rule out stroke.
+Physical hardware has not been verified. The earlier gesture demo remains available.
