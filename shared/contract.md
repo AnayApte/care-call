@@ -23,7 +23,7 @@ Definition of MVP: steps 1 to 5 working live on the venue network (or a phone ho
 
 Layers, in priority order, each independently cuttable:
 - L2 iMessage (Photon): caregiver gets a text, can reply "1" or "on my way" to acknowledge, and can ask for status.
-- L3 Phone call (ElevenLabs voice): if nobody acknowledges, a spoken call to the caregiver.
+- L3 Phone call (ElevenLabs voice): if nobody acknowledges, a spoken call to the caregiver. Preferred route: a Photon SMS number + voice profile connected over SIP to an ElevenLabs agent (counts for both tracks). Rey's `server/integrations/telephony.py` exposes `place_call(request: dict) -> None` (the Request JSON from section 8; raises on failure, no retries). The server calls it once at `ESCALATE_CALL_AFTER_S` if the request is still open and `ENABLE_PHONE_CALL=true`; if the file is missing the step is skipped.
 - L4 Adaptation agent (CREAO, committed track): between sessions, a CREAO agent reads how the patient's gestures actually performed and proposes settings tuned to that patient, which the caregiver approves. See section 19.
 - L5 Edge node (QNX on the Pi): a Python node on the Pi that posts events with `source: "edge"`.
 - L6 Face input (head tilt, eyebrow): second input type.
@@ -42,7 +42,9 @@ Browser (web/)  --events-->  Server (server/, public HTTPS)  <--poll-- ESP32 (fi
   personal kNN (in browser)      escalation timer, TTS, Photon,
                                  CREAO, Sentry
 Pi/QNX edge node (edge/)  --events-->  Server    (stretch)
+Server  <--localhost HTTP-->  Photon bridge (server/photon-bridge/, Node + spectrum-ts)  <-->  iMessage
 ```
+- Photon only ships a TypeScript SDK (`spectrum-ts`), so a small Node bridge runs in the same Railway container as the Python server. Python calls it to send; it forwards inbound messages to `POST /api/webhooks/photon`. Only one bridge may run against the Photon project at a time (every running bridge receives and answers every message).
 - Server is deployed to a public HTTPS host (Railway or Render) by Anay by 5:15 PM. Everything talks to it. This avoids venue Wi-Fi device-to-device blocking.
 - Web is deployed to Vercel. Local dev points at the deployed server or localhost via `VITE_API_BASE`.
 - The classifier runs in the browser (kNN). The server stores samples and requests, nothing heavy.
@@ -57,7 +59,7 @@ Pi/QNX edge node (edge/)  --events-->  Server    (stretch)
 | Firmware | ESP32-S3, Arduino framework (PlatformIO or Arduino IDE), ArduinoJson, Adafruit SSD1306 + GFX, WiFiClientSecure with `setInsecure()` (prototype only; disclose) |
 | Edge | Python 3 on the Pi, OpenCV; the QNX AI module is decided by Alex after talking to QNX |
 | Voice | ElevenLabs text-to-speech via the server only |
-| Messaging | Photon iMessage agent via the server only |
+| Messaging | Photon iMessage via the server only: `server/photon-bridge/` (Node 20, `spectrum-ts`, `tsx`) |
 | Handoff agent | CREAO agent on agent.creao.ai, called from the server via API Trigger |
 | Observability | Sentry (server + web) |
 | LLM for iMessage status Q&A | Gemini API (fast), NOT CREAO (CREAO runs take minutes) |
@@ -71,7 +73,7 @@ You may only edit files in your own folders. Need a change elsewhere? Message th
 | Path | Owner |
 | --- | --- |
 | `shared/contract.md`, `shared/fixtures/*` | Anay (locked) |
-| `server/` core (`main.py`, `routes/`, `models.py`, `db.py`, `escalation.py`, `tts.py`, `sentry_setup.py`) | Anay |
+| `server/` core (`main.py`, `routes/`, `models.py`, `db.py`, `escalation.py`, `tts.py`, `sentry_setup.py`, `seed.py`, `Dockerfile`, `start.sh`, `photon-bridge/`) | Anay |
 | `server/integrations/photon.py`, `server/integrations/elevenlabs.py` | Anay |
 | `server/integrations/creao.py`, `server/integrations/telephony.py` | Rey |
 | `web/` (everything except `web/src/cv/`) | Rey |
@@ -119,7 +121,7 @@ DeviceState (what the ESP32 polls):
 ```json
 {"device_id":"beacon_1","mode":"alert","active_request":{"id":"r_1","display":"Water","created_at":"ISO8601"},"message":null}
 ```
-`mode`: `idle`, `alert`, `acked`. When acked, `message` is a short string like "On the way" shown for 5 seconds on the OLED.
+`mode`: `idle`, `alert`, `acked`. When acked, `message` is a short string like "On the way" shown for 5 seconds on the OLED, and `active_request` is still the request that was just acked.
 
 ## 9. HTTP API (all JSON unless noted; base URL is `PUBLIC_BASE_URL`)
 
@@ -135,13 +137,13 @@ DeviceState (what the ESP32 polls):
 | `GET /api/requests?patient_id=&since=` | web | list, newest first; `since` is an ISO timestamp |
 | `POST /api/requests/{id}/ack` | web | body `{by}` acknowledge from the dashboard |
 | `GET /api/device/state?device_id=` | ESP32 | header `X-Device-Token`; returns DeviceState |
-| `POST /api/device/ack` | ESP32 | header `X-Device-Token`; body `{device_id}`; acks the active request with `by:"button"` |
+| `POST /api/device/ack` | ESP32 | header `X-Device-Token`; body `{device_id}`; acks the active request with `by:"button"`; 409 if nothing is open (ignore it) |
 | `POST /api/device/heartbeat` | ESP32 | header `X-Device-Token`; body `{device_id,rssi}` |
 | `POST /api/tts` | web | body `{text}`; returns `audio/mpeg`; cached on disk by hash |
-| `POST /api/webhooks/photon` | Photon | inbound iMessage; parse acknowledgements and status questions |
+| `POST /api/webhooks/photon` | Photon bridge | header `X-Bridge-Secret`; body `{from, text, request_id?}` (`request_id` set on a poll tap); returns `{reply}` for the bridge to send back |
 | `POST /api/cv/sessions` | web | store one gesture session summary (section 19) |
 | `POST /api/requests/{id}/feedback` | web | body `{correct: boolean}`; caregiver marks a request right or wrong |
-| `POST /api/adapt/run` | web | starts the CREAO adaptation run for the patient, returns `{job_id}` |
+| `POST /api/adapt/run` | web | body `{patient_id}`; starts the CREAO adaptation run for the patient, returns `{job_id}`; 503 if CREAO is off |
 | `GET /api/adapt/{job_id}` | web | `{status:"pending"|"done"|"failed", proposal: AdaptConfig|null, explanation_md}` |
 | `GET /api/patients/{id}/adapt-config` | web | the approved AdaptConfig (defaults if none) |
 | `PUT /api/patients/{id}/adapt-config` | web | body AdaptConfig; stores it after the caregiver taps Apply |
@@ -157,7 +159,8 @@ Errors: JSON `{"error":"message"}` with a correct HTTP status. The web UI must h
 - Training (Josh): 15 samples per label, captured over a 3 second hold. After training, show leave-one-out accuracy as a percentage.
 - Escalation (Anay, server): at 0 s create request, beacon alert, bedside voice. At `ESCALATE_MESSAGE_AFTER_S=20` send the iMessage. At `ESCALATE_CALL_AFTER_S=75` place the call (only if `ENABLE_PHONE_CALL=true`). Stop everything on ack. Idempotent: never send the same escalation twice.
 - Ack (Anay): from any channel, sets `status=acked`, records `ack_latency_ms`, sets the device state to `acked` for 5 seconds, and the bedside speaks "Help is coming."
-- Photon inbound (Anay): a message starting with `1`, `ok`, `ack` or `on my way` acks the latest open request. `status` returns open requests. Other free text goes to Gemini with the last 24 hours of requests as context.
+- Photon outbound (Anay): the escalation iMessage is a text plus a native iMessage poll ("On my way" / "Can't come"). If the button or dashboard acks after the text went out, the caregiver gets a short "already answered" update.
+- Photon inbound (Anay): a message starting with `1`, `ok`, `ack` or `on my way`, or tapping "On my way" on the poll, acks the request (the polled one, else the latest open). `status` returns open requests. Other free text goes to Gemini with the last 24 hours of requests as context. Only numbers in `CAREGIVER_PHONE` are answered.
 - Feature flags (env): `ENABLE_PHOTON`, `ENABLE_PHONE_CALL`, `ENABLE_CREAO`. If a layer is off or failing, the golden path must still work.
 - Honest labels: any summary the CREAO agent fails to produce is replaced by a template and labelled "template summary".
 
@@ -176,7 +179,7 @@ Errors: JSON `{"error":"message"}` with a correct HTTP status. The web UI must h
 
 ## 12. Environment variables (`server/.env`, example in `.env.example`)
 
-`PUBLIC_BASE_URL`, `DEVICE_TOKEN`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `PHOTON_*` (decided after reading Photon docs), `CAREGIVER_PHONE`, `CREAO_API_KEY`, `CREAO_AGENT_ID`, `GEMINI_API_KEY`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT=hackathon`, `ESCALATE_MESSAGE_AFTER_S`, `ESCALATE_CALL_AFTER_S`, `ENABLE_PHOTON`, `ENABLE_PHONE_CALL`, `ENABLE_CREAO`.
+`PUBLIC_BASE_URL`, `DEVICE_TOKEN`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET`, `BRIDGE_SECRET` (optional, defaults to `DEVICE_TOKEN`), `CAREGIVER_PHONE` (E.164, comma separated for several caregivers), `DB_PATH` (`/data/carecall.db` on Railway, on a volume), `SEED_DEMO`, `CREAO_API_KEY`, `CREAO_AGENT_ID`, `GEMINI_API_KEY`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT=hackathon`, `ESCALATE_MESSAGE_AFTER_S`, `ESCALATE_CALL_AFTER_S`, `ENABLE_PHOTON`, `ENABLE_PHONE_CALL`, `ENABLE_CREAO`.
 Web: `VITE_API_BASE`, `VITE_SENTRY_DSN`.
 CREAO keys (`capi_...`) never go in the browser or firmware.
 
@@ -259,7 +262,7 @@ Caregiver feedback ("that was wrong" on a request in `/caregiver`, Rey's UI) cal
 
 **Human in the loop and safety rails:** the caregiver sees the proposal and the explanation on `/caregiver` with Apply and Dismiss. Nothing changes without a tap. `web/src/cv/adapt.ts` (Josh) clamps every value (`hold_frames` 6 to 30, `min_confidence` 0.6 to 0.95) and ignores unknown keys, so a bad agent output can never break the trigger. Apply calls `PUT /api/patients/{id}/adapt-config`; the patient page reads the config at start. "Retrain" labels open the existing training flow for just those labels.
 
-**Interface between folders (Rey writes `server/integrations/creao.py`, Anay's routes call it):** `start_adaptation(patient: dict, config: dict, sessions: list[dict], feedback: list[dict]) -> str` returns a job id; `get_adaptation(job_id: str) -> {"status":"pending"|"done"|"failed","proposal":dict|None,"explanation_md":str|None}`. If the job fails, show "Could not generate a suggestion" and change nothing. Never invent a fallback proposal.
+**Interface between folders (Rey writes `server/integrations/creao.py`, Anay's routes call it):** `start_adaptation(patient: dict, config: dict, sessions: list[dict], feedback: list[dict]) -> str` returns a job id; `get_adaptation(job_id: str) -> {"status":"pending"|"done"|"failed","proposal":dict|None,"explanation_md":str|None}`. If the job fails, show "Could not generate a suggestion" and change nothing. Never invent a fallback proposal. The server calls `start_adaptation` with keyword arguments (`patient=`, `config=`, `sessions=`, `feedback=`), so keep those names. Each feedback item is `{request_id, label, confidence, source, correct, created_at}`. `GET /api/adapt/{job_id}` returns `failed` (never an error) when CREAO is off, `creao.py` is missing, or the agent returns anything unexpected.
 
 **Demo data (Anay, `server/seed.py`):** seed 3 to 5 synthetic session summaries for Maria, shaped like the example above (one flaky label, one confusion pair), so the agent has real input. Josh's live sessions append to the same table.
 
