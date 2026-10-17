@@ -1,6 +1,8 @@
 # Instructions for Codex and other coding agents
 
-Read `shared/contract.md` in full before doing anything. It is the single source of truth.
+Read `shared/contract.md` in full before doing anything. It is the single source of truth. Then read `agents/<your-human>.md` for your role, folders and first tasks.
+
+Schedule: we started at 3 PM Saturday. Push to your branch and merge a small PR to `main` every hour on the hour until the 12:30 AM freeze. Final code freeze is 8 AM Sunday.
 
 Rules:
 1. Only edit files in the folders your human owns (contract section 6). Ask your human before touching anything else.

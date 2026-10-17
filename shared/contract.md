@@ -43,7 +43,7 @@ Browser (web/)  --events-->  Server (server/, public HTTPS)  <--poll-- ESP32 (fi
                                  CREAO, Sentry
 Pi/QNX edge node (edge/)  --events-->  Server    (stretch)
 ```
-- Server is deployed to a public HTTPS host (Railway or Render) by Anay by 4:30 PM. Everything talks to it. This avoids venue Wi-Fi device-to-device blocking.
+- Server is deployed to a public HTTPS host (Railway or Render) by Anay by 5:15 PM. Everything talks to it. This avoids venue Wi-Fi device-to-device blocking.
 - Web is deployed to Vercel. Local dev points at the deployed server or localhost via `VITE_API_BASE`.
 - The classifier runs in the browser (kNN). The server stores samples and requests, nothing heavy.
 - ESP32 polls once per second. No websockets, no MQTT.
@@ -77,18 +77,20 @@ You may only edit files in your own folders. Need a change elsewhere? Message th
 | `web/` (everything except `web/src/cv/`) | Rey |
 | `web/src/cv/`, `benchmark/` | Josh |
 | `firmware/`, `edge/` | Alex |
-
-Alex has CV experience and is the CV reviewer: Alex does a 20 minute pairing with Josh at 2 PM (landmarks to the 42-number vector, how to test the classifier) and reviews Josh's approach at the 3 PM and 6 PM checkpoints, but does not edit `web/src/cv/` (Josh does, via PR). The edge node in `edge/` reuses the same feature vector and classifier logic in Python, so it must match `web/src/cv/features.ts`.
+| `agents/<name>.md` | each person owns their own file |
 | `docs/`, README sections | whoever writes them; use separate files `docs/<name>.md` |
 | `shared/status/<name>.md`, `shared/changelog/<name>.md` | each person owns their own file |
 
 Status and changelog are per-person files so nobody ever edits the same file.
 
+Alex has CV experience and is the CV reviewer: Alex does a 20 minute pairing with Josh at 3 PM (landmarks to the 42-number vector, how to test the classifier) and reviews Josh's approach at the 4 PM and 6:30 PM checkpoints, but does not edit `web/src/cv/` (Josh does, via PR). The edge node in `edge/` reuses the same feature vector and classifier logic in Python, so it must match `web/src/cv/features.ts`.
+
+
 ## 7. Git rules
 
 - Branch per person: `anay/...`, `rey/...`, `josh/...`, `alex/...`. Small PRs into `main`. Squash merge.
 - `git pull --rebase origin main` before every push. Never force-push `main`.
-- Commit at least every 30 to 45 minutes. Message format: `area: what changed`.
+- Push to your branch and merge a small PR to `main` at least once an hour, on the hour (4:00, 5:00, 6:00 ...) until the 12:30 AM freeze. Small and often beats big and late. Commit at least every 30 to 45 minutes. Message format: `area: what changed`.
 - Create the root `.gitignore` BEFORE the first commit (provided). Never commit `.env`, `secrets.h`, `node_modules`, `.venv`, model files.
 - Final code freeze is 8:00 AM Sunday. 8:00 to 11:00 AM is reserved for the demo video, README, track evidence and Devpost; only bug fixes merge after 8:00 AM. Submit target 11:00 AM, with 11:00 to 12:00 as buffer.
 - Merge freezes: see the plan doc. After 12:30 AM only Josh (4 to 6 AM) and the morning crew merge, and only to their own folders.
@@ -156,8 +158,8 @@ Errors: JSON `{"error":"message"}` with a correct HTTP status. The web UI must h
 ### Fallback and optional hardware
 
 - Only the Pi, its camera and the ESP32 are guaranteed. Gesture recognition always runs in the browser on a laptop or phone webcam; the Pi is only for the optional edge node.
-- If the ESP32 or beacon is not working, set `ESCALATE_MESSAGE_AFTER_S=0` so the iMessage goes out immediately and is the main alert. Build iMessage before the bedside voice so it works by the 6 PM checkpoint.
-- Extra bedside hardware (speaker or screen reading `/api/device/state`) is optional. Alex asks MLH at 5 PM. Go/no-go at the 6 PM checkpoint: only if the golden path works end to end and the hardware is in hand by 6:30 PM. Hard stop at 9 PM; if it is not working by then, drop it. Nothing new after the 12:30 AM freeze.
+- If the ESP32 or beacon is not working, set `ESCALATE_MESSAGE_AFTER_S=0` so the iMessage goes out immediately and is the main alert. Build iMessage before the bedside voice so it works by the 6:30 PM checkpoint.
+- Extra bedside hardware (speaker or screen reading `/api/device/state`) is optional. Alex asks MLH at 5 PM. Go/no-go at the 6:30 PM checkpoint: only if the golden path works end to end and the hardware is in hand by 7:00 PM. Hard stop at 9 PM; if it is not working by then, drop it. Nothing new after the 12:30 AM freeze.
 
 ## 11. Sentry (Anay sets up, everyone keeps it healthy)
 
@@ -175,8 +177,8 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 ## 13. Fixtures and mocks (so nobody is blocked)
 
 - `shared/fixtures/request_open.json`, `device_state_alert.json`, `device_state_idle.json`, `patient.json`.
-- Until the real piece exists, build against fixtures: Rey uses `web/src/cv/mock.ts` (Josh replaces it) with a button that fires a fake request; Alex uses `curl` against fixtures or a tiny local mock server until Anay's server is live (Anay posts the public URL in the group chat by 4:30 PM).
-- `/beacon` (Rey): a phone-friendly page that behaves like the ESP32 (polls device state, shows the word, beeps, big ACK button). This is the safety net if hardware fails. It must exist by 6 PM.
+- Until the real piece exists, build against fixtures: Rey uses `web/src/cv/mock.ts` (Josh replaces it) with a button that fires a fake request; Alex uses `curl` against fixtures or a tiny local mock server until Anay's server is live (Anay posts the public URL in the group chat by 5:15 PM).
+- `/beacon` (Rey): a phone-friendly page that behaves like the ESP32 (polls device state, shows the word, beeps, big ACK button). This is the safety net if hardware fails. It must exist by 6:30 PM.
 
 ## 14. Design (Rey owns, kept simple)
 
@@ -187,16 +189,18 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 
 ## 15. Hardware spec (Alex owns)
 
-- Pins in `firmware/pins.h` (check the S3 board's own pin numbers). Components: button (INPUT_PULLUP, debounced), active buzzer, LED(s), I2C OLED.
-- Loop: every 1 s `GET /api/device/state`; `alert` → buzzer pattern, LED red, OLED shows `display`; `acked` → LED green, OLED shows `message` for 5 s; `idle` → LED dim, OLED shows "Ready". Every 5 s `POST /api/device/heartbeat`. Button press → `POST /api/device/ack`.
-- Must keep working if Wi-Fi drops: show "OFFLINE" on the OLED and reconnect in a loop.
+- Hardware we actually have (MLH rental): Grove LCD RGB Backlight (I2C, 16x2; use it instead of an OLED, and its backlight colour replaces the LEDs: red alert, green acked, dim idle), Grove button x2, Grove buzzer, Grove and plain jumper wires (6 of each kind), breadboard, about 10 resistors, Logitech webcam, Google Nest Mini (Bluetooth speaker, paired to the laptop that runs the patient page), Raspberry Pi 4 kit plus our HiPi board, ESP32-S3. No LED socket kit.
+- Pins in `firmware/pins.h` (check the S3 board's own pin numbers). Components: button (INPUT_PULLUP, debounced), active buzzer, I2C Grove LCD (power from the 5V pin; test it first, and if the display is garbled add a level shifter or check the module version).
+- Loop: every 1 s `GET /api/device/state`; `alert` → buzzer pattern, backlight red, LCD shows `display`; `acked` → backlight green, LCD shows `message` for 5 s; `idle` → backlight dim, LCD shows "Ready". Every 5 s `POST /api/device/heartbeat`. Button press → `POST /api/device/ack`.
+- Must keep working if Wi-Fi drops: show "OFFLINE" on the LCD and reconnect in a loop.
 - Edge (stretch): Python on the Pi captures a camera frame, runs hand landmarks, and posts the same Request with `source:"edge"`. Gate: only continue if QNX boots with the camera working by 5 PM.
 
 ## 16. Definition of done per role
 
 - Anay: server routes per section 9, deployed, escalation, TTS, Photon, Sentry, handoff note before leaving.
 - Rey: `/patient`, `/caregiver`, `/beacon`, polished, consuming the real API, plus CREAO and telephony integrations after 9 PM.
-- Josh: `useGestureTrigger()` hook, training flow, kNN, benchmark and `results.json`.
+- Josh: `useGestureTrigger()` hook, training flow, kNN, benchmark and `results.json`, plus the stretch model comparison in section 18.
+- Rey (also): leads the simulated-impairment data collection in section 18 at 9 PM, with Josh.
 - Alex: firmware on the real ESP32 hitting the live server, physical build, optional Pi/QNX node, demo hardware set.
 
 ## 17. Track evidence checklist (README sections, owner in brackets)
@@ -208,3 +212,13 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 - Espressif: photo of the ESP32 unit working [Alex].
 - ElevenLabs: voice output used for the bedside and the call [Anay].
 - Paper: link to the design file [Rey]. Devin: note on what Devin built, with a screenshot [whoever uses it].
+
+## 18. Model and data (Rey's idea: train on stroke-like movement)
+
+We have no stroke patients and no verified public dataset of post-stroke hand movement, and we will not claim either. What we can do honestly is collect our own data from teammates simulating limited dexterity, and show that a personal model beats a generic one on it.
+
+- Simulated impairment (about 30 minutes, 9 PM, Rey and Josh, Alex helps): each teammate records the same 3 request labels plus "neutral" in 3 conditions: normal hand, 2 fingers taped together, and non-dominant hand wearing a glove. Use the collect page in `benchmark/` (Josh builds it from the training flow, it exports `benchmark/data/*.json`, one file per person and condition). Label every file with `simulated: true`.
+- Models compared on that data (Josh, in `benchmark/`): (1) MediaPipe generic gesture recognizer, (2) personal kNN (the shipped model), (3) stretch: a small model such as logistic regression or a tiny MLP trained on the same 42-number features. Report accuracy per condition in `benchmark/results.json`. Leave-one-out within a person; never test on the same samples used to train.
+- The shipped model stays kNN unless the stretch model is clearly better and still trains in under 5 seconds in the browser. Do not change the training UI for the stretch model.
+- Pitch and README wording: "tested with teammates simulating limited dexterity", never "tested on stroke patients". Add the line "assistive prototype, not a medical device".
+- Cut order: if short on time, drop (3), then drop the extra conditions, keep (1) vs (2).
