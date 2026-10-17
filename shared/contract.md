@@ -24,7 +24,7 @@ Definition of MVP: steps 1 to 5 working live on the venue network (or a phone ho
 Layers, in priority order, each independently cuttable:
 - L2 iMessage (Photon): caregiver gets a text, can reply "1" or "on my way" to acknowledge, and can ask for status.
 - L3 Phone call (ElevenLabs voice): if nobody acknowledges, a spoken call to the caregiver.
-- L4 Handoff report (CREAO agent): shift-handoff summary and pattern flags from the request log.
+- L4 Adaptation agent (CREAO, committed track): between sessions, a CREAO agent reads how the patient's gestures actually performed and proposes settings tuned to that patient, which the caregiver approves. See section 19.
 - L5 Edge node (QNX on the Pi): a Python node on the Pi that posts events with `source: "edge"`.
 - L6 Face input (head tilt, eyebrow): second input type.
 
@@ -139,7 +139,13 @@ DeviceState (what the ESP32 polls):
 | `POST /api/device/heartbeat` | ESP32 | header `X-Device-Token`; body `{device_id,rssi}` |
 | `POST /api/tts` | web | body `{text}`; returns `audio/mpeg`; cached on disk by hash |
 | `POST /api/webhooks/photon` | Photon | inbound iMessage; parse acknowledgements and status questions |
-| `POST /api/reports/handoff` | web | starts a CREAO run, returns `{job_id}` |
+| `POST /api/cv/sessions` | web | store one gesture session summary (section 19) |
+| `POST /api/requests/{id}/feedback` | web | body `{correct: boolean}`; caregiver marks a request right or wrong |
+| `POST /api/adapt/run` | web | starts the CREAO adaptation run for the patient, returns `{job_id}` |
+| `GET /api/adapt/{job_id}` | web | `{status:"pending"|"done"|"failed", proposal: AdaptConfig|null, explanation_md}` |
+| `GET /api/patients/{id}/adapt-config` | web | the approved AdaptConfig (defaults if none) |
+| `PUT /api/patients/{id}/adapt-config` | web | body AdaptConfig; stores it after the caregiver taps Apply |
+| `POST /api/reports/handoff` | web | optional extra: shift-handoff summary from a CREAO run, returns `{job_id}` |
 | `GET /api/reports/handoff/{job_id}` | web | `{status:"pending"|"done"|"failed", summary_md}` |
 | `GET /api/benchmark` | web | contents of `benchmark/results.json` |
 
@@ -198,15 +204,15 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 ## 16. Definition of done per role
 
 - Anay: server routes per section 9, deployed, escalation, TTS, Photon, Sentry, handoff note before leaving.
-- Rey: `/patient`, `/caregiver`, `/beacon`, polished, consuming the real API, plus CREAO and telephony integrations after 9 PM.
-- Josh: `useGestureTrigger()` hook, training flow, kNN, benchmark and `results.json`, plus the stretch model comparison in section 18.
+- Rey: `/patient`, `/caregiver`, `/beacon`, polished, consuming the real API, plus the CREAO adaptation agent and its Apply card (section 19); the phone call only if time allows.
+- Josh: `useGestureTrigger()` hook, training flow, kNN, benchmark and `results.json`, `session.ts` and `adapt.ts` (section 19), plus the stretch model comparison in section 18.
 - Rey (also): leads the simulated-impairment data collection in section 18 at 9 PM, with Josh.
 - Alex: firmware on the real ESP32 hitting the live server, physical build, optional Pi/QNX node, demo hardware set.
 
 ## 17. Track evidence checklist (README sections, owner in brackets)
 
 - Sentry: traces, a real bug story, replay, uptime alert screenshot [everyone, Anay compiles].
-- CREAO: agent ID and a share link to a run in the README [Rey].
+- CREAO: agent ID, a share link to a run and the Apply card screenshot in the README [Rey].
 - Photon: screenshot of the iMessage thread [Anay].
 - QNX: photo of the board running our node plus the AI module used [Alex].
 - Espressif: photo of the ESP32 unit working [Alex].
@@ -222,3 +228,47 @@ We have no stroke patients and no verified public dataset of post-stroke hand mo
 - The shipped model stays kNN unless the stretch model is clearly better and still trains in under 5 seconds in the browser. Do not change the training UI for the stretch model.
 - Pitch and README wording: "tested with teammates simulating limited dexterity", never "tested on stroke patients". Add the line "assistive prototype, not a medical device".
 - Cut order: if short on time, drop (3), then drop the extra conditions, keep (1) vs (2).
+
+## 19. CREAO: the Adaptation agent (committed track)
+
+We are committing to the CREAO track, and the agent is part of how the product works, not an add-on. The idea: a stroke patient's movement changes day to day (fatigue, tremor, a better or worse day). The agent looks at how the patient's gestures actually performed and proposes settings that fit them better, so the system adapts to the patient instead of the patient adapting to the system.
+
+CREAO rules require a CREAO agent on agent.creao.ai doing real core work, so the agent is built and run there. CREAO runs take minutes and do not stream, so it never classifies frames and never sits on the live path. It tunes between sessions. The browser kNN stays the real-time classifier and works with the agent off.
+
+**What the browser collects (Josh, `web/src/cv/session.ts`):** a session summary per use, posted with `POST /api/cv/sessions` when the patient page closes or every 10 minutes:
+```json
+{"patient_id":"p_demo","started_at":"...","ended_at":"...",
+ "config_version":1,
+ "labels":{"water":{"attempts":9,"fired":6,"abandoned":3,"mean_conf":0.84,"min_conf":0.61,"mean_hold_frames_to_fire":15},
+           "pain":{"attempts":7,"fired":2,"abandoned":5,"mean_conf":0.71,"min_conf":0.48,"mean_hold_frames_to_fire":22}},
+ "confusions":[{"intended":"pain","predicted":"help","count":4}],
+ "false_triggers_neutral":2}
+```
+Caregiver feedback ("that was wrong" on a request in `/caregiver`, Rey's UI) calls `POST /api/requests/{id}/feedback`.
+
+**What goes to the agent (Anay's route `POST /api/adapt/run`, calling Rey's `creao.py`):** the patient, the current AdaptConfig, the last 5 session summaries and the recent feedback, as JSON.
+
+**What the agent returns (an AdaptConfig proposal plus a plain-words explanation):**
+```json
+{"version":2,"hold_frames":14,"min_confidence":0.8,
+ "labels":{"pain":{"min_confidence":0.7,"hold_frames":18}},
+ "retrain_labels":["pain"],
+ "suggest_replace":[{"label":"pain","reason":"often confused with help"}],
+ "explanation_md":"Pain was abandoned 5 of 7 times and mixed up with help 4 times. Suggest a slightly longer hold and re-recording pain."}
+```
+
+**Human in the loop and safety rails:** the caregiver sees the proposal and the explanation on `/caregiver` with Apply and Dismiss. Nothing changes without a tap. `web/src/cv/adapt.ts` (Josh) clamps every value (`hold_frames` 6 to 30, `min_confidence` 0.6 to 0.95) and ignores unknown keys, so a bad agent output can never break the trigger. Apply calls `PUT /api/patients/{id}/adapt-config`; the patient page reads the config at start. "Retrain" labels open the existing training flow for just those labels.
+
+**Interface between folders (Rey writes `server/integrations/creao.py`, Anay's routes call it):** `start_adaptation(patient: dict, config: dict, sessions: list[dict], feedback: list[dict]) -> str` returns a job id; `get_adaptation(job_id: str) -> {"status":"pending"|"done"|"failed","proposal":dict|None,"explanation_md":str|None}`. If the job fails, show "Could not generate a suggestion" and change nothing. Never invent a fallback proposal.
+
+**Demo data (Anay, `server/seed.py`):** seed 3 to 5 synthetic session summaries for Maria, shaped like the example above (one flaky label, one confusion pair), so the agent has real input. Josh's live sessions append to the same table.
+
+**Demo plan:** runs take minutes, so run the agent before the demo on the seeded data and keep the finished result. Live, show: the session summary showing the flaky label, the "Suggest adjustments" card with the finished CREAO result and a link to the run, tap Apply, then the benchmark or training screen showing the effect. Say plainly in the demo that the run was done ahead because it takes a few minutes.
+
+**Optional extra (only if everything else is done):** the same agent also writes a shift-handoff summary from the request log (`POST /api/reports/handoff`). Cut this first.
+
+**Order of work:** Rey builds the agent on agent.creao.ai first, with a pasted sample session summary and no server, and gets one good run and a share link by about 8 PM. Then wire `creao.py`. Josh needs `session.ts` and `adapt.ts` working before the 9 PM data collection ends. CREAO comes before the phone call.
+
+**Evidence for Devpost (Rey, save in `docs/`):** the agent ID, a share link to one real run, a screenshot of the agent on agent.creao.ai, and the Apply card in `/caregiver`. Select the CREAO track on Devpost.
+
+**Honesty:** the agent tunes settings from synthetic data. It does not train the model, diagnose, or give clinical advice. Describe it as "adapts the settings to how this person actually moves", not as treating or monitoring a real patient.

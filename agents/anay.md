@@ -10,7 +10,8 @@ Awake and building: now until 9 PM, then 6 to 7 AM onward. Leaving at 9 PM, so l
 4. ElevenLabs text-to-speech (`/api/tts`), cached and pre-generated for the demo words.
 5. Photon iMessage (`photon.py`), behind `ENABLE_PHOTON`. Find out how Photon access works first and post what you learn. If the ESP32 is not working, set `ESCALATE_MESSAGE_AFTER_S=0`.
 6. Sentry (server and web setup): tracing, logs, uptime check on `/api/device/health`. Save real-bug screenshots in `docs/sentry-evidence/`.
-7. 8:45 PM: deploy checklist and handoff note.
+7. CREAO adaptation plumbing (contract section 19): store session summaries (`POST /api/cv/sessions`), request feedback, the adapt-config GET and PUT, and `POST /api/adapt/run` plus `GET /api/adapt/{job_id}` calling Rey's `creao.py` (return a clean failure, never an invented proposal). `server/seed.py`: 3 to 5 synthetic session summaries for Maria shaped like the contract example.
+8. 8:45 PM: deploy checklist and handoff note.
 
 ## Hard rules for you
 - You lock the contract. If someone asks for a change in `shared/CONTRACT_REQUESTS.md`, answer it in the next hour and merge the contract change on its own PR.
