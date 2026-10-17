@@ -1,66 +1,40 @@
-# Josh's gesture code
+# Josh's arm check and alert demo
 
-Tracks a hand, learns what each pose means, and triggers a request after a short hold.
-Uses Rey's trained model. Personal training assigns the request meanings.
+Open `/src/cv/armDemo.html` in the web dev server.
 
-## Try it
+1. Start the camera and keep both arms in view.
+2. Click **Start arm demo** and follow the prompt.
+3. A sustained arm drop is shown as an observation for someone to review.
 
-1. Run the web dev server and open `/src/cv/demo.html`.
-2. Start the camera.
-3. Record neutral, water, pain, help and bathroom. Hold each pose for three seconds.
-4. Repeat a learned pose and watch the request appear.
+To test without a camera, click **Run simulated arm drop**.
 
-Record a different pose for each label. Neutral is your resting hand.
-The demo shows requests locally; it is not connected to the caregiver server.
-Download examples before reloading. Reloading clears training.
-Training accuracy can look too high when examples come from one hold, so test fresh poses too.
+## Connect the hardware
 
-## Main files
+Enter the Care Call server URL and enable **Send HELP** before starting.
+The page sends one HELP request. Alex's ESP32 polls that server and alerts.
+The page then watches for acknowledgement. It also shows whether a device
+heartbeat is recent. A server receipt does not prove the buzzer sounded.
 
-- `camera.ts`: tracks the hand.
-- `features.ts`: prepares hand data for storage and Rey's model.
-- `baseline.ts` and `model.ts`: run Rey's model in the browser.
-- `training.ts` and `personal.ts`: collect examples and learn request labels.
-- `trigger.ts` and `useGestureTrigger.ts`: check the hold and eight-second cooldown.
-- `adapt.ts` and `session.ts`: load approved settings and prepare session reports.
-- `personalDemo.ts`: working example of these pieces together.
+`beaconPreview.html` is a browser preview for testing the same alert flow.
+Its acknowledgement uses the dashboard endpoint; it is not a physical device.
 
-## Connect the patient page
+Josh's code does not change Alex's firmware or Anay's server. Only the generic
+HELP label is available, so arm observations stay in the page for now.
+Network delivery failures are shown and are not automatically retried.
 
-Rey owns the page and server request wiring.
-Create the personal classifier once, then load its labeled samples:
+## Limits
 
-```ts
-const personal = createPersonalClassifier(loadBundledBaseline());
-personal.setSamples(storedSamples);
-```
+This is an unvalidated movement demo. It cannot diagnose or rule out stroke.
+It does not check face or speech. Lost tracking gives an incomplete result.
+Suspected stroke symptoms require calling 911 immediately; do not wait for this demo.
+Test only with teammates and synthetic data.
 
-For each new camera frame:
-
-```ts
-const prediction = frame.vector ? personal.predict(frame.vector) : null;
-gesture.processPrediction(prediction, frame.timestamp);
-```
-
-Use the hook's `onTrigger` callback to send one request. Reset the hold when stopping
-or retraining. Recognition starts after all five labels have 15 examples.
-The default trigger needs 12 matching frames at confidence 0.8 or higher.
-
-Keep stored samples in the existing 42-number format. `personal.predict` handles
-Rey's model format internally. Alex should use the same conversion on the Pi.
-Camera setup currently expects `@mediapipe/tasks-vision@0.10.22-rc.20250304`;
-keep the package and WASM versions matched. See `camera.ts` for download URLs.
+[Stroke warning signs](https://www.stroke.org/en/about-stroke/stroke-symptoms)
 
 ## Checks
 
-18 tests, the TypeScript check and the demo build passed. Browser calculations
-match Rey's reference examples. Live webcam performance still needs testing.
+Run the JavaScript checks using the commands in `GESTURES.md`, adding `arm.test.cjs`.
+Run `python web/src/cv/server.test.py` with the server dependencies installed
+for the alert/device/acknowledgement checks. Tests use a temporary database.
 
-After installing the web dependencies, run these from the repo root:
-
-```sh
-web/node_modules/.bin/tsc --target ES2022 --module commonjs --moduleResolution node --lib ES2022,DOM --strict --esModuleInterop --resolveJsonModule --skipLibCheck --rootDir . --outDir /tmp/care-call-cv-check web/src/cv/*.ts
-CV_TEST_BUILD=/tmp/care-call-cv-check/web/src/cv node --test web/src/cv/*.test.cjs
-```
-
-Assistive prototype, not a medical device. Use teammates simulating limited dexterity, not patient data.
+The earlier personal-gesture demo is at `demo.html`; its notes are in `GESTURES.md`.

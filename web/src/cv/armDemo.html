@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Care Call arm movement demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f6f8; color: #172d3d; font: 18px/1.5 system-ui; }
+    main { max-width: 1050px; margin: 28px auto; padding: 0 20px; }
+    h1 { font-size: 32px; margin-bottom: 8px; } h2 { font-size: 23px; margin-top: 0; }
+    .notice { padding: 16px 20px; background: #fff0dc; border-left: 5px solid #a64418; border-radius: 8px; }
+    .grid { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; margin: 24px 0; }
+    section { background: white; border: 1px solid #d2dce4; border-radius: 12px; padding: 20px; }
+    .camera { position: relative; width: 100%; aspect-ratio: 4/3; background: #142d40; border-radius: 8px; overflow: hidden; }
+    video, canvas { width: 100%; height: 100%; position: absolute; inset: 0; transform: scaleX(-1); }
+    button, input { font: inherit; padding: 10px 14px; border: 1px solid #8399aa; border-radius: 7px; margin: 4px 0; }
+    button { cursor: pointer; background: #edf4f8; color: #142d40; } button.primary { background: #164f68; color: white; }
+    button:disabled { opacity: .5; cursor: default; } input[type=url] { width: 100%; }
+    progress { width: 100%; height: 20px; } .small { font-size: 15px; color: #415a6c; }
+    #observation { font-size: 21px; font-weight: 600; } #alert-status { overflow-wrap: anywhere; }
+    @media(max-width: 750px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Arm movement → caregiver alert</h1>
+  <p>A guided camera demo that observes arm lowering and can send HELP to the caregiver device.</p>
+  <p class="notice"><strong>Suspect a stroke? Call 911 immediately.</strong> Do not wait for this demo or a caregiver reply. This prototype cannot diagnose or rule out stroke. Face and speech checks are not included.</p>
+  <div class="grid">
+    <section>
+      <h2>1. Try the camera check</h2>
+      <p>Keep one person, both shoulders, elbows and wrists visible. Raise both arms comfortably in front.</p>
+      <div class="camera"><video id="arm-video" muted playsinline></video><canvas id="arm-overlay"></canvas></div>
+      <p id="input-mode" class="small">Camera off. No video is uploaded.</p>
+      <button id="camera-start" class="primary">Start camera</button>
+      <button id="check-start" disabled>Start arm demo</button>
+      <button id="check-stop" disabled>Stop</button>
+      <p id="observation" role="status">Ready for a demonstration.</p>
+      <progress id="arm-progress" max="1" value="0" aria-label="Demo progress"></progress>
+      <p class="small">The demo records a starting position, then observes for up to ten seconds. Its movement thresholds are unvalidated demo settings.</p>
+      <button id="simulate-drop">Run simulated arm drop</button>
+      <button id="manual-help">Unable to raise an arm / get help</button>
+    </section>
+    <section>
+      <h2>2. Connect the alert device</h2>
+      <label for="alert-server">Care Call server URL</label>
+      <input id="alert-server" type="url" value="http://127.0.0.1:8000" spellcheck="false">
+      <p><label><input id="enable-device" type="checkbox"> Send HELP to this server when movement is flagged</label></p>
+      <p class="small">Uses synthetic demo patient Maria. The ESP32 must use the same server and have Alex's firmware running. A simulated drop can also send an alert when enabled.</p>
+      <button id="server-check">Check server and device</button>
+      <p id="device-status" role="status">Device connection not checked.</p>
+      <p id="alert-status" role="status">Preview only. No alert sent.</p>
+      <p class="small">The device receives a generic HELP request. A server receipt is not proof that the buzzer sounded. Do not put device tokens or API keys in this page.</p>
+      <a href="./beaconPreview.html" target="_blank" rel="noopener">Open browser beacon preview</a>
+    </section>
+  </div>
+  <p class="small">Assistive prototype, not a medical device. Test with teammates acting out movement changes.</p>
+  <p class="small"><a href="https://www.stroke.org/en/about-stroke/stroke-symptoms" target="_blank" rel="noopener">Stroke warning signs — American Stroke Association</a> · <a href="./demo.html">Earlier gesture communication demo</a></p>
+</main>
+<script type="module" src="./armDemo.ts"></script>
+</body>
+</html>
