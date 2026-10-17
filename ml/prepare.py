@@ -18,7 +18,7 @@ HERE = Path(__file__).resolve().parent
 ANN_DIR = HERE / "data" / "annotations"
 OUT_DIR = HERE / "data"
 SPLITS = ("train", "val", "test")
-MAX_PER_CLASS = 2000
+MAX_PER_CLASS = None  # None = keep every hand
 SEED = 42
 TRAIN_FRACTION = 0.8
 N_POINTS = 21
@@ -103,7 +103,7 @@ def main():
     print("\nhands kept per class (after cap):")
     for idx, name in enumerate(classes):
         vecs, users = per_class[name]
-        order = rng.permutation(len(vecs))[:MAX_PER_CLASS]
+        order = rng.permutation(len(vecs))[:MAX_PER_CLASS]  # [:None] keeps all
         counts = {"train": 0, "val": 0}
         for j in order:
             split = user_split(users[j])

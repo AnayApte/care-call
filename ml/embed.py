@@ -40,6 +40,15 @@ def embed(x42, model=None):
     return h
 
 
+def embed_batch(X, model=None):
+    """[N, 42] -> [N, 32] embeddings, same maths as embed() but vectorised."""
+    model = model or load_model()
+    h = (np.asarray(X, np.float32) - np.asarray(model["mean"], np.float32)) / np.asarray(model["std"], np.float32)
+    for layer in model["layers"][: model["embedding_layer"] + 1]:
+        h = np.maximum(h @ np.asarray(layer["W"], np.float32).T + np.asarray(layer["b"], np.float32), 0.0)
+    return h
+
+
 def probabilities(x42, model=None):
     """42 floats -> softmax over model['classes']."""
     model = model or load_model()
