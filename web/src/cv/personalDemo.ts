@@ -15,6 +15,7 @@ const capture = element<HTMLButtonElement>("capture"), download = element<HTMLBu
 const label = element<HTMLSelectElement>("label");
 const progress = element<HTMLProgressElement>("progress");
 const baseline = loadBundledBaseline();
+element("model-version").textContent = `Hand model: ${baseline.version.replace("baseline_v", "version ")}`;
 const personal = createPersonalClassifier(baseline);
 const trigger = createGestureTrigger();
 let controller: AbortController | null = null;

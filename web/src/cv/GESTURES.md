@@ -2,6 +2,8 @@
 
 Tracks a hand, learns what each pose means, and triggers a request after a short hold.
 Uses Rey's trained model. Personal training assigns the request meanings.
+Now uses Rey's version 2 model, trained on about 1.05 million hand examples with
+small rotations and noise added during training. See `ml/report.md` for his results.
 
 ## Try it
 

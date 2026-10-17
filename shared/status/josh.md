@@ -8,6 +8,7 @@ Works:
 - Sends one HELP alert through the existing server and watches for acknowledgement.
 - Browser beacon preview works. Simulated drop -> HELP -> acknowledgement tested.
 - 29 JavaScript tests, two server checks, TypeScript check and demo build passed.
+- Gesture demo updated to Rey's version 2 model; all 29 JavaScript tests still pass.
 
 Next:
 - Josh: test the new demo with a live camera.
