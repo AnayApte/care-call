@@ -7,6 +7,7 @@ Rule: if anything goes wrong we report failure. We never make up a proposal.
 """
 import logging
 
+import sentry_sdk
 from fastapi import APIRouter, HTTPException
 
 from .. import config, store
@@ -46,7 +47,13 @@ def adapt_run(body: AdaptRunIn):
         "feedback": store.recent_feedback(patient["id"]),
     }
     try:
-        job_id = creao.start_adaptation(**inputs)
+        with sentry_sdk.start_span(op="gen_ai.invoke_agent", name="invoke_agent creao-adaptation") as span:
+            span.set_data("gen_ai.system", "creao")
+            span.set_data("gen_ai.operation.name", "invoke_agent")
+            span.set_data("gen_ai.agent.name", "creao-adaptation")
+            span.set_data("sessions", len(inputs["sessions"]))
+            span.set_data("feedback", len(inputs["feedback"]))
+            job_id = creao.start_adaptation(**inputs)
     except Exception:
         log.exception("creao.start_adaptation failed")
         raise HTTPException(502, "could not start the CREAO run")
@@ -64,7 +71,10 @@ def adapt_status(job_id: str):
     except HTTPException:
         return FAILED
     try:
-        result = creao.get_adaptation(job_id)
+        with sentry_sdk.start_span(op="gen_ai.invoke_agent", name="poll creao-adaptation") as span:
+            span.set_data("gen_ai.system", "creao")
+            span.set_data("job_id", job_id)
+            result = creao.get_adaptation(job_id)
     except Exception:
         log.exception("creao.get_adaptation failed for %s", job_id)
         return FAILED

@@ -11,6 +11,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional
 
+import sentry_sdk
+
 from . import config, store
 from .integrations import photon
 
@@ -28,10 +30,13 @@ def _send_message(request_id: str) -> None:
         return
     if store.claim_escalation(request_id, 1):
         log.info("escalation.message %s", request_id)
-        try:
-            photon.send_message(_message_text(req), req["id"], f"Maria needs: {req['display']}")
-        except Exception:
-            log.exception("escalation.message failed for %s", request_id)
+        with sentry_sdk.start_transaction(op="escalation.message", name="escalation.message") as tx:
+            tx.set_tag("request_id", request_id)
+            try:
+                sent = photon.send_message(_message_text(req), req["id"], f"Maria needs: {req['display']}")
+                tx.set_tag("sent", sent)
+            except Exception:
+                log.exception("escalation.message failed for %s", request_id)
 
 
 def _place_call(request_id: str) -> None:
@@ -46,16 +51,24 @@ def _place_call(request_id: str) -> None:
         return
     if store.claim_escalation(request_id, 2):
         log.info("escalation.call %s", request_id)
-        try:
-            telephony.place_call(req)
-        except Exception:
-            log.exception("escalation.call failed for %s", request_id)
+        with sentry_sdk.start_transaction(op="escalation.call", name="escalation.call") as tx:
+            tx.set_tag("request_id", request_id)
+            try:
+                telephony.place_call(req)
+            except Exception:
+                log.exception("escalation.call failed for %s", request_id)
 
 
 def acknowledge(request_id: str, by: str) -> Optional[dict]:
     """Ack from any channel. If the caregiver was already texted, tell them it is handled."""
-    before = store.get_request(request_id)
-    req = store.ack_request(request_id, by)
+    with sentry_sdk.start_span(op="request.ack", name=f"request.ack {by}") as span:
+        before = store.get_request(request_id)
+        req = store.ack_request(request_id, by)
+        if before and req and before["status"] == "open":
+            span.set_tag("acked_by", by)
+            span.set_tag("latency_ms", req["ack_latency_ms"])
+            sentry_sdk.set_tag("latency_ms", req["ack_latency_ms"])
+            log.info("request.ack %s by %s after %s ms", request_id, by, req["ack_latency_ms"])
     if before and req and before["status"] == "open" and req["escalation_level"] >= 1 and by != "imessage":
         seconds = round((req["ack_latency_ms"] or 0) / 1000)
         text = f"Update: {req['display']} was answered ({by}) after {seconds} s. No need to come."

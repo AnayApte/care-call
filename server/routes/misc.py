@@ -1,8 +1,9 @@
 import json
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 
-from .. import config
+from .. import config, tts as tts_engine
 from ..models import TtsIn
 
 router = APIRouter()
@@ -10,8 +11,12 @@ router = APIRouter()
 
 @router.post("/api/tts")
 def tts(body: TtsIn):
-    # Step 1 stub: ElevenLabs comes in a later step.
-    raise HTTPException(501, "tts not implemented yet")
+    """MP3 for the bedside speaker. Cached, so repeat phrases are instant and free."""
+    try:
+        audio = tts_engine.speak(body.text)
+    except tts_engine.TtsError as exc:
+        raise HTTPException(exc.status, str(exc))
+    return Response(audio, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/api/benchmark")

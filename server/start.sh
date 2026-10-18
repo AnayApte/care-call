@@ -6,6 +6,9 @@ mkdir -p "$(dirname "${DB_PATH:-/data/carecall.db}")"
 # SEED_DEMO=true refreshes Maria's synthetic sessions on boot (real data is kept).
 if [ "$SEED_DEMO" = "true" ]; then python3 -m server.seed; fi
 
+# Pre-generate the bedside phrases in the background (cached, so only the first boot calls ElevenLabs).
+if [ -n "$ELEVENLABS_API_KEY" ]; then python3 -m server.tts & fi
+
 # Photon bridge, only when Photon is on. Restarts itself if it crashes.
 if [ "$ENABLE_PHOTON" = "true" ]; then
   (cd server/photon-bridge && while true; do

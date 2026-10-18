@@ -81,7 +81,7 @@ def get_request(request_id: str) -> Optional[dict]:
 
 def list_requests(patient_id: Optional[str] = None, since: Optional[datetime] = None) -> list[dict]:
     with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM requests WHERE (? IS NULL OR patient_id=?) ORDER BY n DESC",
+        rows = conn.execute("SELECT * FROM requests WHERE (? IS NULL OR patient_id=?) ORDER BY created_at DESC, n DESC",
                             (patient_id, patient_id)).fetchall()
     out = [_request(r) for r in rows]
     if since is not None:
@@ -91,7 +91,7 @@ def list_requests(patient_id: Optional[str] = None, since: Optional[datetime] = 
 
 def open_requests() -> list[dict]:
     with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM requests WHERE status='open' ORDER BY n DESC").fetchall()
+        rows = conn.execute("SELECT * FROM requests WHERE status='open' ORDER BY created_at DESC, n DESC").fetchall()
     return [_request(r) for r in rows]
 
 
