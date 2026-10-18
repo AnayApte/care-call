@@ -25,11 +25,6 @@ No secret values are in this file. **Every live value is in Railway → `care-ca
 
 No open branches from Anay. Pi scripts (`edge/`) were merged by Anay; Alex owns that folder from here.
 
---- | --- | --- |
-| `main` | Everything below except the two branches in this table | Live on Railway |
-| `anay/phone-call` | Phone call at 75 s (ElevenLabs agent over Photon SIP), `/api/webhooks/call`, full `server/.env.example`, handoff notes, this doc | Safe to merge: calls stay off until `ENABLE_PHONE_CALL=true`. Needs the setup in section 13. |
-| `anay/caregiver-pi` | `edge/caregiver/caregiver.py`, `edge/caregiver/test_lcd.py`, `edge/bedside/bedside.py` | Caregiver Pi tested live. **Alex: review and merge.** |
-
 ---
 
 ## 2. How the pieces fit
