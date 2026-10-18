@@ -99,13 +99,13 @@ export default function PatientPage() {
                     {REQUEST_LABELS.filter((l) => l !== result).map((l) => (
                       <button key={l} type="button" className="fb" onClick={() => feedbackCorrect(l)}>{DISPLAY_WORD[l]}</button>
                     ))}
-                    <button type="button" className="fb quiet" onClick={() => feedbackCorrect("neutral")}>Nothing</button>
+                    <button type="button" className="fb quiet" onClick={() => feedbackCorrect(null)}>Nothing</button>
                   </div>
                 </>
               )}
             </div>
           )}
-          {result && feedback === "done" && <div className="feedback thanks"><p>Thanks. The model learned from that. Tap or press space to continue.</p></div>}
+          {result && feedback === "done" && <div className="feedback thanks"><p>Thanks. Tap or press space to continue.</p></div>}
           <p className="notice">{state.accuracy !== null && <>Training check: {Math.round(state.accuracy * 100)}% (leave-one-out).<br /></>}Assistive prototype, not a medical device.</p>
         </>
       )}

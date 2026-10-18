@@ -4,6 +4,7 @@ import { createGestureTrigger, createPersonalClassifier, createSampleCapture, st
 import { TRAINING_ORDER } from "@/lib/labels";
 import { sounds } from "@/lib/sounds";
 import { createSteadinessGate } from "@/lib/steady";
+import { spreadFrames, trimSamples } from "@/lib/samples";
 import { drawHand, type HandTone } from "@/lib/drawHand";
 
 export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "listening";
@@ -16,8 +17,8 @@ const DONE_SHOW_MS = 1100;
 const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
 const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000;
-const MAX_SAMPLES_PER_LABEL = 45; // newest samples win, so the model follows how the movement looks today
-const MAX_HOLD_VECTORS = 30; // frames remembered from a recognition hold, added as samples after feedback // after training the hand is still holding the last pose; do not fire on it
+const MAX_HOLD_VECTORS = 30; // frames remembered from a recognition hold
+const FEEDBACK_SAMPLES = 5; // frames spread across the hold that become samples after Yes or a corrected word // after training the hand is still holding the last pose; do not fire on it
 
 export type OnboardingState = {
   phase: Phase;
@@ -39,17 +40,6 @@ export type OnboardingState = {
 };
 
 const idleTrigger: TriggerState = { label: null, progress: 0, cooldownMs: 0, fired: null };
-
-/** Keep the newest samples per label so feedback can move the model over time. */
-function trimSamples(samples: Sample[]): Sample[] {
-  const kept: Sample[] = [];
-  const counts = new Map<Label, number>();
-  for (let i = samples.length - 1; i >= 0; i -= 1) {
-    const n = counts.get(samples[i].label) ?? 0;
-    if (n < MAX_SAMPLES_PER_LABEL) { kept.push(samples[i]); counts.set(samples[i].label, n + 1); }
-  }
-  return kept.reverse();
-}
 
 function completeLabels(samples: Sample[]): Set<Label> {
   const counts = new Map<Label, number>();
@@ -267,13 +257,14 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     patch({ result: null, feedback: null, trigger: idleTrigger });
   }, [patch]);
 
-  /** Feeds the remembered hold frames back into the personal model under `label`, and tells the server. */
-  const learnFrom = useCallback((label: Label, wasCorrect: boolean) => {
+  /** Tells the server how the request went and, when `label` is given, feeds a few hold frames back into the
+   * personal model under that word. "Nothing" passes no label: the server hears it was wrong, the model is untouched. */
+  const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
     const s = session.current;
-    const vectors = s.firedVectors;
+    const vectors = spreadFrames(s.firedVectors, FEEDBACK_SAMPLES);
     s.firedVectors = [];
     if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
-    if (vectors.length === 0) { patch({ feedback: "done" }); return; }
+    if (!label || vectors.length === 0) { patch({ feedback: "done" }); return; }
     const fresh: Sample[] = vectors.map((vector) => ({ label, vector }));
     try {
       s.samples = trimSamples([...s.samples, ...fresh]);
@@ -291,8 +282,8 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
 
   const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
   const feedbackNo = useCallback(() => patch({ feedback: "correcting" }), [patch]);
-  /** `label` is what they actually meant; "neutral" means it should not have fired. */
-  const feedbackCorrect = useCallback((label: Label) => learnFrom(label, false), [learnFrom]);
+  /** `label` is what they actually meant. "Nothing" (null) only records the miss; it does not teach the model. */
+  const feedbackCorrect = useCallback((label: Label | null) => learnFrom(label, false), [learnFrom]);
 
   const retrain = useCallback(async () => {
     const s = session.current;
