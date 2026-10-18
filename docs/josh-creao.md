@@ -15,8 +15,9 @@ own private settings. Git does not carry keys to Railway.
 2. In CREAO, enable API Trigger and copy the agent/app ID. Create an app-scoped API key.
 3. Set `CREAO_AGENT_ID`, `CREAO_API_KEY` and `ENABLE_CREAO=true` privately in
    `server/.env` or Railway. Restart the server. Never put the key in the web app.
-4. Open `/caregiver`. Click **Ask CREAO to review**. Read its explanation and
-   compare the settings. **Apply** saves them; **Dismiss** leaves them alone.
+4. Open `/caregiver`. Click **Ask CREAO to review**. A short popup appears when
+   it finishes. **Read full report** opens `/caregiver/reports/<run-id>` with the
+   explanation and settings comparison. **Apply** saves them; **Dismiss** leaves them alone.
 5. The patient screen loads approved settings within 30 seconds, between holds.
    Only requested movements need recording again. Other examples stay saved.
 
@@ -38,3 +39,8 @@ plus the web build and `approval.test.cjs` using the CV test setup. Include
 A simulated test does not count as a live CREAO run or sponsor evidence.
 The adapter validates both CREAO output fields, `text` and `chatText`, because
 the saved summary and full reply can differ. Invalid output is never applied.
+
+Closing the popup changes nothing. Saved reports remain readable after refresh
+and after Apply or Dismiss. They are kept in this browser. A report opened from
+a link without its original approval context is read-only. Opening or refreshing
+a report reads the existing run; it does not start a new paid run.

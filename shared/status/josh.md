@@ -15,7 +15,13 @@ Works:
 - Simulated browser checks confirmed Dismiss saves nothing and Apply saves the shown settings.
 - CREAO agent created and connected locally with a private, agent-scoped key.
 - Real API run on four synthetic sessions reached the caregiver screen; explicit Apply saved Pain-only retraining.
-- 50 JavaScript tests, 16 server checks, TypeScript and the web build pass.
+- Added a small summary popup and a readable full-report route on josh/report-popup.
+- Patient screen has a visible Caregiver reports link during setup and regular use.
+- Caregiver feedback uses buttons. Patient camera gestures cannot answer the caregiver's Yes/No check.
+- Removed shared-camera thumb feedback because it cannot tell the patient from the caregiver.
+- Reports survive refresh and Apply/Dismiss. Direct links without approval context are read-only.
+- Kept Rey's two-hand tracking and camera picker from PR #22 alongside Step 5.
+- 64 JavaScript tests, 16 server checks, TypeScript and the web build pass.
 - Earlier guided arm demo and browser beacon preview remain available.
 
 Next:
