@@ -24,7 +24,7 @@ export async function startSimulatedTracker(
   let raf = 0;
   let stopped = false;
   const key = (event: KeyboardEvent) => {
-    const poses = { "0": 4, "1": 0, "2": 1, "3": 2, "4": 3 };
+    const poses = { "0": 4, "1": 0, "2": 1, "3": 2, "4": 3, "5": 5 }; // 5 is a spare pose for an added word
     if (event.key in poses) index = poses[event.key as keyof typeof poses];
     if (event.key.toLowerCase() === "x") hidden = !hidden;
   };

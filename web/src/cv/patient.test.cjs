@@ -29,6 +29,22 @@ test('patient adapter records five labels and exposes readiness and training che
   LABELS.forEach((label, index) => assert.equal(classifier.predict(vectorFor(index)).label, label));
 });
 
+test('an added word is learned once it has 15 samples, and stays unready until then', () => {
+  const classifier = createPersonalClassifier();
+  const capture = createSampleCapture('tea', 0);
+  let result;
+  for (let now = 0; now <= 3000; now += 100) result = capture.update(vectorFor(7), now);
+  const tea = result.samples;
+  classifier.setSamples([...recordAll(), ...tea.slice(0, 10)]);
+  assert.equal(classifier.isReady(), false);
+  assert.equal(classifier.counts().tea, 10);
+  classifier.setSamples([...recordAll(), ...tea]);
+  assert.equal(classifier.isReady(), true);
+  assert.equal(classifier.predict(vectorFor(7)).label, 'tea');
+  assert.equal(classifier.predict(vectorFor(0)).label, 'water');
+  assert.throws(() => createSampleCapture('Not a label', 0));
+});
+
 test('patient instances keep separate personal meanings', () => {
   const trained = createPersonalClassifier();
   trained.setSamples(recordAll());

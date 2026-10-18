@@ -60,6 +60,33 @@ def replace_samples(patient_id: str, label: str, vectors: list[list[float]]) -> 
     return [_sample(row) for row in rows]
 
 
+# Vocabulary: the default words plus any the patient added
+
+def vocabulary(patient_id: str) -> list[dict]:
+    with db.connect() as conn:
+        rows = conn.execute("SELECT label, display, speech FROM vocabulary WHERE patient_id=? ORDER BY created_at",
+                            (patient_id,)).fetchall()
+    return PATIENTS[patient_id]["vocabulary"] + [dict(r) for r in rows]
+
+
+def add_word(patient_id: str, label: str, display: str, speech: str) -> bool:
+    """False when the label is already a word (or neutral)."""
+    if label == "neutral" or any(w["label"] == label for w in vocabulary(patient_id)):
+        return False
+    with db.connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO vocabulary (patient_id, label, display, speech, created_at) VALUES (?,?,?,?,?)",
+                     (patient_id, label, display.strip(), speech.strip(), now_iso()))
+    return True
+
+
+def clear_vocabulary(patient_id: str) -> int:
+    """Removes the added words and their recordings. The defaults stay."""
+    with db.connect() as conn:
+        conn.execute("DELETE FROM samples WHERE patient_id=? AND label IN"
+                     " (SELECT label FROM vocabulary WHERE patient_id=?)", (patient_id, patient_id))
+        return conn.execute("DELETE FROM vocabulary WHERE patient_id=?", (patient_id,)).rowcount
+
+
 # Requests
 
 def _request(row) -> dict:
@@ -76,7 +103,7 @@ def create_request(patient_id: str, label: str, confidence: float, source: str) 
 
 def create_request_once(patient_id: str, label: str, confidence: float, source: str,
                         client_request_id: str | None = None) -> tuple[dict, bool]:
-    word = next(w for w in PATIENTS[patient_id]["vocabulary"] if w["label"] == label)
+    word = next(w for w in vocabulary(patient_id) if w["label"] == label)
     with db.connect() as conn:
         conn.execute("BEGIN IMMEDIATE")
         if client_request_id is not None:

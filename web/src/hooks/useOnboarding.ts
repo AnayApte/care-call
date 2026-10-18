@@ -3,7 +3,7 @@ import { api, API_BASE, PATIENT_ID, fixturePatient, type Patient } from "@/lib/a
 import { createHandArbiter, createPersonalClassifier, createSampleCapture, startHandTracker, type Handedness, type Label, type Sample, type TrackedFrame } from "@/lib/cv";
 import { createGestureTrigger, type TriggerState } from "@/cv/trigger";
 import { loadHandedness, saveHandedness } from "@/lib/handednessPref";
-import { TRAINING_ORDER } from "@/lib/labels";
+import { TRAINING_ORDER, displayWord, toLabel, trainingOrder } from "@/lib/labels";
 import { sounds } from "@/lib/sounds";
 import { createSteadinessGate } from "@/lib/steady";
 import { trimSamples } from "@/lib/samples";
@@ -31,6 +31,8 @@ export type OnboardingState = {
   patient: Patient;
   index: number;
   order: Label[];
+  /** Only added words are left to train, so the caregiver may skip them for now. */
+  canSkip: boolean;
   countdown: number;
   progress: number;
   hint: string;
@@ -53,7 +55,7 @@ const idleTrigger: TriggerState = { label: null, progress: 0, cooldownMs: 0, fir
 
 export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>, cameraId?: string) {
   const [state, setState] = useState<OnboardingState>({
-    phase: "loading", patient: fixturePatient, index: 0, order: TRAINING_ORDER, countdown: 0, progress: 0, hint: "", lifting: null,
+    phase: "loading", patient: fixturePatient, index: 0, order: TRAINING_ORDER, canSkip: false, countdown: 0, progress: 0, hint: "", lifting: null,
     handPresent: false, trigger: idleTrigger, result: null, feedback: null, accuracy: null, toast: null,
     flow: { phase: "waiting_release", request: null, input: null, error: "", online: true }, voice: "off", cameraError: "", savingTraining: false,
   });
@@ -67,6 +69,9 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     phase: "loading" as Phase,
     index: 0,
     order: TRAINING_ORDER.slice(),
+    vocabulary: fixturePatient.vocabulary,
+    /** True while the add-word form is open, so typing near the camera cannot send a request. */
+    paused: false,
     samples: [] as Sample[],
     capture: null as ReturnType<typeof createSampleCapture> | null,
     holdStartedAt: 0,
@@ -189,7 +194,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.capture = null;
     voteHand();
     sounds.check();
-    setPhase("done", { progress: 1, lifting: null, hint: s.index + 1 < s.order.length ? `Next: ${s.order[s.index + 1]}.` : "Movements ready." });
+    setPhase("done", { progress: 1, lifting: null, hint: s.index + 1 < s.order.length ? `Next: ${displayWord(s.order[s.index + 1], s.vocabulary)}.` : "Movements ready." });
     sampleQueue.enqueue(label, samples.map(sample => sample.vector), s.retraining.key());
     if (!sampleQueue.storageOk()) toast("Browser storage is unavailable. Keep this page open until training is saved.", "error");
     void saveTraining();
@@ -199,7 +204,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         s.trigger.reset();
         flow.interrupt();
         s.listenGraceUntil = performance.now() + LISTEN_GRACE_MS;
-        setPhase("listening", { lifting: label, progress: 0, trigger: idleTrigger, accuracy: s.classifier.leaveOneOutAccuracy() });
+        setPhase("listening", { lifting: label, progress: 0, trigger: idleTrigger, canSkip: false, accuracy: s.classifier.leaveOneOutAccuracy() });
         return;
       }
       s.index += 1;
@@ -253,6 +258,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       return;
     }
     if (s.phase === "listening") {
+      if (s.paused) { s.trigger.reset(); s.triggerState = idleTrigger; return; }
       if (frame.vector && frame.timestamp - s.lastPredictionAt < 1000 / 12) return;
       s.lastPredictionAt = frame.timestamp;
       const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
@@ -265,7 +271,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       // Approved updates wait for the current hold to finish; the engine keeps its cooldown.
       if (s.pendingConfig && s.triggerState.progress === 0) {
         applyConfig(s.pendingConfig);
-        const order = s.retraining.order(s.samples, TRAINING_ORDER);
+        const order = s.retraining.order(s.samples, trainingOrder(s.vocabulary));
         if (order.length) {
           s.order = order; s.index = 0;
           s.handSeenSince = null;
@@ -301,7 +307,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       ]);
       if (cancelled) return;
       const s = session.current;
-      if (patientRes.ok) patch({ patient: patientRes.data });
+      if (patientRes.ok) {
+        s.vocabulary = patientRes.data.vocabulary;
+        patch({ patient: patientRes.data });
+      }
       s.samples = trimSamples(sampleQueue.load(samplesRes.ok ? samplesRes.data.map(x => ({ label: x.label as Label, vector: x.vector })) : undefined));
       if (!samplesRes.ok) toast("Server unreachable. Using recordings saved on this computer.", "error");
       applyConfig(approved ?? s.config);
@@ -314,13 +323,13 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         s.classifier.setSamples([]);
         toast("Saved training could not load. Please retrain movements.", "error");
       }
-      const order = s.retraining.order(s.samples, TRAINING_ORDER);
+      const order = s.retraining.order(s.samples, trainingOrder(s.vocabulary));
       void saveTraining();
       if (order.length === 0) {
         setPhase("listening", { accuracy: s.classifier.leaveOneOutAccuracy() });
       } else {
         s.order = order; s.index = 0;
-        setPhase("waiting", { index: 0, order, hint: approved?.retrain_labels.length
+        setPhase("waiting", { index: 0, order, canSkip: order.every(l => !TRAINING_ORDER.includes(l)), hint: approved?.retrain_labels.length
           ? "Your caregiver asked you to record these movements again." : "Any movement they can repeat works." });
       }
     })();
@@ -424,6 +433,9 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     if (flow.snapshot().input) { toast("Wait for the current request to finish before retraining."); return; }
     s.index = 0;
     s.order = TRAINING_ORDER.slice();
+    // Retrain starts over with the default words: added words and their recordings are removed.
+    s.vocabulary = s.vocabulary.filter(w => TRAINING_ORDER.includes(w.label));
+    s.samples = s.samples.filter(smp => TRAINING_ORDER.includes(smp.label));
     s.retraining.reset();
     s.trigger.reset();
     s.result = null;
@@ -434,9 +446,56 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     saveHandedness(null);
     s.lastPredictionAt = -Infinity;
     s.triggerState = idleTrigger;
-    setPhase("waiting", { index: 0, order: s.order, lifting: null, progress: 0, trigger: idleTrigger, result: null, feedback: null, accuracy: null, hint: "Any movement they can repeat works." });
+    setPhase("waiting", { index: 0, order: s.order, canSkip: false, lifting: null, progress: 0, trigger: idleTrigger, result: null, feedback: null, accuracy: null, hint: "Any movement they can repeat works." });
+    setState(st => ({ ...st, patient: { ...st.patient, vocabulary: s.vocabulary } }));
     flow.interrupt();
+    const r = await api.clearVocabulary();
+    if (!r.ok) toast("Server unreachable, added words may come back on reload", "error");
   }, [setPhase, toast, flow]);
+
+  /** Stops the trigger while the add-word form is open. */
+  const setPaused = useCallback((paused: boolean) => {
+    const s = session.current;
+    s.paused = paused;
+    s.trigger.reset();
+    s.triggerState = idleTrigger;
+    patch({ trigger: idleTrigger });
+  }, [patch]);
+
+  /** Saves a new word on the server, then trains just that word. Returns an error message, or null on success. */
+  const addWord = useCallback(async (display: string, speech: string): Promise<string | null> => {
+    const s = session.current;
+    const label = toLabel(display);
+    if (!label || label === "neutral") return "Use a word that starts with a letter.";
+    if (s.vocabulary.some(w => w.label === label)) return "That word is already on the list.";
+    if (flow.snapshot().input) return "Wait for the current request to finish first.";
+    const r = await api.addWord({ label, display: display.trim(), speech: speech.trim() });
+    if (!r.ok) return `Could not add the word: ${r.error}`;
+    s.vocabulary = r.data.vocabulary;
+    s.order = [label];
+    s.index = 0;
+    s.paused = false;
+    s.trigger.reset();
+    s.triggerState = idleTrigger;
+    s.handSeenSince = null;
+    flow.interrupt();
+    patch({ patient: r.data });
+    setPhase("waiting", { index: 0, order: s.order, canSkip: true, lifting: null, progress: 0, trigger: idleTrigger, hint: "Any movement they can repeat works." });
+    return null;
+  }, [patch, setPhase, flow]);
+
+  /** Leaves an added word untrained and goes back to listening. It is offered again on the next load. */
+  const skipWord = useCallback(() => {
+    const s = session.current;
+    s.timers.forEach((id) => window.clearTimeout(id));
+    s.timers = [];
+    s.capture = null;
+    s.trigger.reset();
+    s.triggerState = idleTrigger;
+    flow.interrupt();
+    s.listenGraceUntil = performance.now() + LISTEN_GRACE_MS;
+    setPhase("listening", { canSkip: false, lifting: null, progress: 0, trigger: idleTrigger, toast: null });
+  }, [setPhase, flow]);
 
   return { state, start: startCountdown, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect,
     feedbackSkip: () => patch({ feedback: "done" }), retryRequest: flow.retry, checkRequest: flow.poll,
@@ -444,5 +503,5 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       await speech.enable();
       const current = flow.snapshot();
       if (current.request) speech.say(current.request.status === "acked" ? "Help is coming." : current.request.speech);
-    }, saveTraining };
+    }, saveTraining, addWord, skipWord, setPaused };
 }

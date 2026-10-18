@@ -53,6 +53,13 @@ class SampleBatchIn(BaseModel):
         return vectors
 
 
+class VocabularyIn(BaseModel):
+    """A word added after onboarding. Same label rule as web/src/cv/types.ts LABEL_PATTERN."""
+    label: str = Field(pattern=r"^[a-z][a-z0-9_]{0,23}$")
+    display: str = Field(min_length=1, max_length=40)
+    speech: str = Field(min_length=1, max_length=200)
+
+
 class RequestIn(BaseModel):
     patient_id: str
     label: str

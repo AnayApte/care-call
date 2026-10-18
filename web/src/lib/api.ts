@@ -36,6 +36,11 @@ export const fixturePatient = patientFixture as Patient;
 
 export const api = {
   getPatient: () => call<Patient>(`/api/patients/${PATIENT_ID}`),
+  /** Adds a request word after onboarding. Returns the patient with the updated vocabulary. */
+  /** Removes added words and their recordings, keeping the defaults. Used by Retrain. */
+  clearVocabulary: () => call<unknown>(`/api/patients/${PATIENT_ID}/vocabulary`, { method: "DELETE" }),
+  addWord: (word: VocabularyItem) =>
+    call<Patient>(`/api/patients/${PATIENT_ID}/vocabulary`, { method: "POST", body: JSON.stringify(word) }),
   getSamples: () => call<StoredSample[]>(`/api/patients/${PATIENT_ID}/samples`),
   postSample: (label: string, vector: number[]) =>
     call<StoredSample>(`/api/patients/${PATIENT_ID}/samples`, { method: "POST", body: JSON.stringify({ label, vector }) }),

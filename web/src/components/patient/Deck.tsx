@@ -1,9 +1,11 @@
-import { CARD_COPY } from "@/lib/labels";
+import { cardCopy } from "@/lib/labels";
+import type { VocabularyItem } from "@/lib/api";
 import type { Label } from "@/lib/cv";
 
 /** Flashcard deck: the current label on top, the remaining labels stacked behind, the finished one lifting away. */
-export function Deck({ order, index, lifting, hint, done }: {
+export function Deck({ order, vocabulary, index, lifting, hint, done }: {
   order: Label[];
+  vocabulary: VocabularyItem[];
   index: number;
   lifting: Label | null;
   hint: string;
@@ -11,7 +13,7 @@ export function Deck({ order, index, lifting, hint, done }: {
 }) {
   const current = order[index];
   const remaining = order.length - index - 1;
-  const copy = CARD_COPY[current];
+  const copy = cardCopy(current, vocabulary);
   return (
     <div className="deck" aria-live="polite">
       {Array.from({ length: remaining }, (_, i) => remaining - i).map((n) => (
@@ -26,7 +28,7 @@ export function Deck({ order, index, lifting, hint, done }: {
       {lifting && (
         <div key={lifting} className="card lifting" aria-hidden="true">
           <p className="step" />
-          <h2 className="word">{CARD_COPY[lifting].word}</h2>
+          <h2 className="word">{cardCopy(lifting, vocabulary).word}</h2>
           <p className="ask ok">Got it.</p>
         </div>
       )}

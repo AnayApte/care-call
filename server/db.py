@@ -52,6 +52,14 @@ CREATE TABLE IF NOT EXISTS feedback (
     correct INTEGER NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS vocabulary (
+    patient_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    display TEXT NOT NULL,
+    speech TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (patient_id, label)
+);
 CREATE TABLE IF NOT EXISTS adapt_configs (
     patient_id TEXT PRIMARY KEY,
     config TEXT NOT NULL,

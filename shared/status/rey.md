@@ -1,6 +1,6 @@
 # Status: rey
 
-Updated: 2026-10-17 ~10:10 PM
+Updated: 2026-10-18
 
 Works:
 - `web/` scaffolded: Vite 5, React, TS, Tailwind v4 (`@tailwindcss/vite`), shadcn. `npm run dev` then http://localhost:5173/patient. Tokens in `web/src/styles/tokens.css`.
@@ -11,6 +11,8 @@ Works:
 - Hand landmarks are real (MediaPipe HandLandmarker in `web/src/lib/handTracker.ts`, same model, WASM version and contract s8 feature vector as Josh's camera.ts). Classifier (kNN k=7 vote), capture and trigger (time-based 1 s hold, 0.7 confidence, gentle drain) are stand-ins in `web/src/lib/cvMock.ts` behind the adapter `web/src/lib/cv.ts`. Add `?mock=1` to the URL for a synthetic hand (keys 0 to 4, X, S).
 - Camera picker on /patient: pill at the top centre lists webcams (names show once camera access is allowed), remembers the choice per browser, and restarts tracking on the chosen camera.
 - Two hands in frame: `web/src/lib/handArbiter.ts` decides which one counts. Training holds vote for the hand that did them; the majority locks and survives reload (`carecall.handedness` in localStorage). Once locked the weak hand is ignored even when it is the only hand visible, by design, so it cannot fire a false request. Retrain clears the lock. The lock is MediaPipe's label (mirrored on a selfie camera), so the UI never names a side. Tests: `cd web && npm test`.
+
+- Add a word after onboarding: "Add a word" pill next to "Retrain movements" on /patient. Saves the word on the server (`POST /api/patients/{id}/vocabulary`), trains just that word, then it can be requested like the defaults. Trigger gate is 0.65 (4 of 5 neighbours).
 
 Blocked / need:
 - Josh's `web/src/cv/` to merge, then swap the re-exports in `web/src/lib/cv.ts`. Note for Josh: Rey's page needs landmarks per frame as well as the vector (for the overlay and the steadiness gate).
