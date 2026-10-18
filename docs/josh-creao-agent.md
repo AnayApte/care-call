@@ -1,6 +1,8 @@
 # Care Call review agent
 
 Create an agent with one multiline text input named `session_data`.
+Select Markdown/text output and disable the dashboard template.
+Keep approval required, with no connectors or schedules.
 Use these instructions:
 
 ```text
@@ -20,7 +22,8 @@ tell you what the person actually intended. Prefer new examples when movements
 overlap. Do not lower thresholds blindly. If evidence is insufficient, keep
 settings unchanged and explain why. Do not contact anyone or use outside tools.
 
-Return only one JSON object, without code fences or introductory text:
+The final response and primary output must be only one JSON object.
+Do not add dashboards, HTML, charts, separate reports, code fences or introductory text:
 {
   "proposal": {
     "version": CURRENT_CONFIG_VERSION_PLUS_ONE,

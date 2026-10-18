@@ -23,3 +23,5 @@
 2026-10-17 | Resolved Step 5 conflicts with main. Kept Rey's gentler feedback and different movement styles. "Nothing" enters reports without teaching neutral.
 
 2026-10-17 | Josh asked to finish the CREAO connection and Apply screen. Added the server adapter, recent reports, review comparison and explicit approval. Dismiss leaves settings alone; stale Apply is rejected. 50 JavaScript and 15 server checks pass, plus build and typecheck. Browser flow passed with a labeled simulation. Live CREAO agent and key still need setup.
+
+2026-10-17 | Created the CREAO agent and, with Josh's approval, saved its key privately. A real API run returned the full proposal in chatText, so the reader now validates that field too. The same completed run reached the caregiver screen; Apply saved Pain-only retraining in the separate demo database. 16 server checks pass. Deployed-server key setup remains.

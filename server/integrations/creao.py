@@ -63,19 +63,28 @@ def get_adaptation(job_id: str) -> dict:
         if status != "completed":
             return dict(FAILED)
         result = run.get("result")
-        if isinstance(result, dict) and "text" in result:
-            result = result["text"]
-        if isinstance(result, str):
-            text = result.strip()
-            if text.startswith("```json\n") and text.endswith("```"):
-                text = text[8:-3].strip()
-            result = json.loads(text)
-        if not isinstance(result, dict):
-            return dict(FAILED)
-        proposal = clean_settings(result.get("proposal", result))
-        explanation = result.get("explanation_md")
-        if not isinstance(explanation, str) or not explanation.strip():
-            return dict(FAILED)
-        return {"status": "done", "proposal": proposal, "explanation_md": explanation[:12000]}
+        # CREAO can put a saved summary in text and the full reply in chatText.
+        # Accept either documented field only after the same strict validation.
+        candidates = [result.get("text"), result.get("chatText")] if isinstance(result, dict) and (
+            "text" in result or "chatText" in result) else [result]
+        for candidate in candidates:
+            try:
+                if isinstance(candidate, str):
+                    text = candidate.strip()
+                    if text.startswith("```json\n") and text.endswith("```"):
+                        text = text[8:-3].strip()
+                    candidate = json.loads(text)
+                if not isinstance(candidate, dict):
+                    continue
+                proposal = clean_settings(candidate.get("proposal", candidate))
+                explanation = candidate.get("explanation_md")
+                if not isinstance(explanation, str) or not explanation.strip():
+                    continue
+                # Some JSON replies double-escape line breaks. Keep display plain text.
+                return {"status": "done", "proposal": proposal,
+                        "explanation_md": explanation.replace("\\n", "\n")[:12000]}
+            except (ValueError, TypeError, KeyError):
+                continue
+        return dict(FAILED)
     except (ValueError, TypeError, KeyError, httpx.HTTPError):
         return dict(FAILED)

@@ -13,12 +13,14 @@ Works:
 - Added the server CREAO adapter and caregiver report with explicit Apply and Dismiss on josh/creao-approval.
 - Refresh resumes the same review. Outdated suggestions cannot overwrite newer settings.
 - Simulated browser checks confirmed Dismiss saves nothing and Apply saves the shown settings.
-- 50 JavaScript tests, 15 server checks, TypeScript and the web build pass.
+- CREAO agent created and connected locally with a private, agent-scoped key.
+- Real API run on four synthetic sessions reached the caregiver screen; explicit Apply saved Pain-only retraining.
+- 50 JavaScript tests, 16 server checks, TypeScript and the web build pass.
 - Earlier guided arm demo and browser beacon preview remain available.
 
 Next:
-- Finish CREAO email verification, create the agent and set its key privately. No live run verified yet.
-- Review the CREAO changes after Step 5 PR #15. Setup: docs/josh-creao.md.
+- Review CREAO PR #21 after Step 5 PR #15. Setup and live evidence: docs/josh-creao.md.
+- Set CREAO variables privately on the deployed server; local keys are not pushed through Git.
 - Test real camera movements together.
 - Alex: test the caregiver Pi against the same server, including its buzzer and display.
 - Anay: update the shared plan for Josh's new goal and agree a richer observation format.

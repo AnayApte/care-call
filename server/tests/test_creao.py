@@ -75,6 +75,18 @@ class CreaoWire(unittest.TestCase):
                 self.assertIsNone(result["proposal"])
                 self.assertEqual(result["status"], "pending" if status in ("pending", "queued", "running") else "failed")
 
+    def test_full_proposal_in_chat_text_is_read_when_text_is_a_saved_summary(self):
+        reply = {**RESULT, "explanation_md": "Synthetic reports.\\n\\nRecord Pain again."}
+        run = {"status": "completed", "result": {
+            "text": json.dumps({"proposal_version": 2, "session_data": "saved summary"}),
+            "chatText": json.dumps(reply),
+        }}
+        with patch.object(creao, "_request", return_value=run):
+            result = creao.get_adaptation(RUN)
+        self.assertEqual(result["status"], "done")
+        self.assertEqual(result["proposal"]["retrain_labels"], ["pain"])
+        self.assertEqual(result["explanation_md"], "Synthetic reports.\n\nRecord Pain again.")
+
     def test_bad_json_missing_explanation_and_invalid_numbers_fail(self):
         for output in ("not json", {}, {"proposal": PROPOSAL}, {**RESULT, "proposal": {**PROPOSAL, "hold_frames": float("nan")}}):
             with self.subTest(output=output), patch.object(creao, "_request", return_value={"status": "completed", "result": output}):
