@@ -7,7 +7,8 @@ import type { Point } from "./steady";
 
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-const DETECTIONS_PER_SECOND = 15;
+/** Exponential smoothing on landmark positions. 1 = raw, lower = smoother but laggier. */
+const SMOOTHING = 0.6;
 
 /** Contract section 8: subtract the wrist, divide by the max distance from the wrist, flatten x and y. */
 export function extractFeatures(points: readonly Point[]): number[] | null {
@@ -29,7 +30,7 @@ export async function startRealHandTracker(
   let stopped = false;
   let raf = 0;
   let lastVideoTime = -1;
-  let lastDetection = -Infinity;
+  let smoothed: Point[] | null = null;
   const stop = () => {
     stopped = true;
     cancelAnimationFrame(raf);
@@ -64,14 +65,16 @@ export async function startRealHandTracker(
 
   const tick = (now: number) => {
     if (stopped) return;
-    const due = now - lastDetection >= 1000 / DETECTIONS_PER_SECOND;
     if (document.hidden) {
+      smoothed = null;
       onFrame({ timestamp: now, vector: null, landmarks: null });
-    } else if (detector && video.readyState >= 2 && video.currentTime !== lastVideoTime && due) {
+    } else if (detector && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
       lastVideoTime = video.currentTime;
-      lastDetection = now;
-      const landmarks = (detector.detectForVideo(video, now).landmarks[0] ?? null) as Point[] | null;
-      onFrame({ timestamp: now, vector: landmarks ? extractFeatures(landmarks) : null, landmarks });
+      const raw = (detector.detectForVideo(video, now).landmarks[0] ?? null) as Point[] | null;
+      if (!raw) smoothed = null;
+      else if (!smoothed) smoothed = raw.map((p) => ({ x: p.x, y: p.y }));
+      else smoothed = smoothed.map((q, i) => ({ x: q.x + (raw[i].x - q.x) * SMOOTHING, y: q.y + (raw[i].y - q.y) * SMOOTHING }));
+      onFrame({ timestamp: now, vector: smoothed ? extractFeatures(smoothed) : null, landmarks: smoothed });
     }
     raf = requestAnimationFrame(tick);
   };

@@ -4,6 +4,7 @@ import { createGestureTrigger, createPersonalClassifier, createSampleCapture, st
 import { TRAINING_ORDER } from "@/lib/labels";
 import { sounds } from "@/lib/sounds";
 import { createSteadinessGate } from "@/lib/steady";
+import { drawHand, type HandTone } from "@/lib/drawHand";
 
 export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "listening";
 
@@ -37,12 +38,11 @@ function completeLabels(samples: Sample[]): Set<Label> {
   return new Set([...counts].filter(([, n]) => n >= SAMPLES_PER_LABEL).map(([l]) => l));
 }
 
-export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>) {
+export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, countdown: 0, progress: 0, hint: "", lifting: null,
     handPresent: false, trigger: idleTrigger, lastSent: null, toast: null,
   });
-  const [landmarks, setLandmarks] = useState<HandFrame["landmarks"]>(null);
 
   // Mutable session state read by the 30 fps frame loop. Kept out of React state to avoid stale closures.
   const session = useRef({
@@ -56,6 +56,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     trigger: createGestureTrigger(),
     timers: [] as number[],
     listenGraceUntil: 0,
+    handPresent: false,
   });
 
   const patch = useCallback((p: Partial<OnboardingState>) => setState((s) => ({ ...s, ...p })), []);
@@ -115,8 +116,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
 
   const onFrame = useCallback((frame: HandFrame) => {
     const s = session.current;
-    setLandmarks(frame.landmarks);
     const present = frame.vector !== null;
+    const tone: HandTone = s.phase === "holding" || s.phase === "listening" ? "live" : "faint";
+    if (canvasRef.current && videoRef.current) drawHand(canvasRef.current, videoRef.current, frame.landmarks, tone);
+    if (present !== s.handPresent) { s.handPresent = present; patch({ handPresent: present }); }
     if (s.phase === "holding") {
       const steady = s.gate.update(frame.landmarks);
       if (performance.now() - s.holdStartedAt > HOLD_CAP_MS) {
@@ -126,22 +129,22 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       }
       if (!present || !steady) {
         s.capture = null;
-        patch({ handPresent: present, progress: 0, hint: present ? "Hold still." : "Lost the hand, bring it back into the picture." });
+        patch({ progress: 0, hint: present ? "Hold still." : "Lost the hand, bring it back into the picture." });
         return;
       }
       if (!s.capture) s.capture = createSampleCapture(TRAINING_ORDER[s.index], frame.timestamp);
       const result = s.capture.update(frame.vector, frame.timestamp);
-      if (result.failed) { s.capture = null; patch({ handPresent: present, progress: 0, hint: "Hold still." }); return; }
+      if (result.failed) { s.capture = null; patch({ progress: 0, hint: "Hold still." }); return; }
       if (result.done) { finishLabel(result.samples); return; }
-      patch({ handPresent: present, progress: Math.min(1, (frame.timestamp - s.holdStartedAt) / HOLD_MS), hint: "Hold until the ring is full." });
+      patch({ progress: Math.min(1, (frame.timestamp - s.holdStartedAt) / HOLD_MS), hint: "Hold until the ring is full." });
       return;
     }
     if (s.phase === "listening") {
-      if (performance.now() < s.listenGraceUntil) { s.trigger.reset(); patch({ handPresent: present, trigger: idleTrigger }); return; }
+      if (performance.now() < s.listenGraceUntil) { s.trigger.reset(); return; }
       const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
       const next = s.trigger.update(prediction, frame.timestamp);
       if (import.meta.env.DEV) (window as unknown as { __ccDebug?: unknown }).__ccDebug = { prediction, next, ready: s.classifier.isReady(), samples: s.samples.length };
-      patch({ handPresent: present, trigger: next });
+      patch({ trigger: next });
       if (next.fired) {
         const fired = next.fired;
         patch({ lastSent: fired.label });
@@ -152,8 +155,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       }
       return;
     }
-    patch({ handPresent: present });
-  }, [patch, toast, startCountdown, finishLabel, later]);
+  }, [patch, toast, startCountdown, finishLabel, later, canvasRef, videoRef]);
 
   // Load patient and samples, then pick the starting point.
   useEffect(() => {
@@ -206,5 +208,5 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
   }, [setPhase, toast]);
 
-  return { state, landmarks, start: startCountdown, retrain };
+  return { state, start: startCountdown, retrain };
 }

@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { Deck } from "@/components/patient/Deck";
-import { HandOverlay } from "@/components/patient/HandOverlay";
+import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
 import { TRAINING_ORDER, DISPLAY_WORD } from "@/lib/labels";
@@ -9,7 +9,8 @@ import "@/components/patient/patient.css";
 
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { state, landmarks, start, retrain } = useOnboarding(videoRef);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { state, start, retrain } = useOnboarding(videoRef, canvasRef);
   const { phase, index, countdown, progress, hint, lifting, trigger, lastSent, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const liveWord = lastSent ?? trigger.label;
@@ -18,7 +19,7 @@ export default function PatientPage() {
     <main className="relative h-full overflow-hidden">
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
         <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
-        <HandOverlay landmarks={landmarks} tone={phase === "holding" || phase === "listening" ? "live" : "faint"} />
+        <HandCanvas ref={canvasRef} />
       </div>
 
       {onboarding && (
