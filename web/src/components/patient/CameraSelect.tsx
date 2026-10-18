@@ -1,25 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { saveCameraId } from "@/lib/cameraPref";
+import { useState } from "react";
+import { OFFERS_LAPTOP_WEBCAM, OFFERS_PI_CAMERA, saveCameraId } from "@/lib/cameraPref";
 
-/** Picks which webcam feeds the hand tracker. Labels are blank until camera permission is granted, so the list
- * refreshes when it is opened and whenever a camera is plugged in or removed. */
+/** The Pi-hosted build uses the Pi camera; the Vercel build uses the laptop webcam; dev offers both. */
 export function CameraSelect({ value, onChange }: { value: string | undefined; onChange: (id: string) => void }) {
-  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
-
-  const refresh = useCallback(() => {
-    navigator.mediaDevices?.enumerateDevices()
-      .then((all) => setCameras(all.filter((d) => d.kind === "videoinput" && d.deviceId)))
-      .catch(() => setCameras([]));
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    navigator.mediaDevices?.addEventListener("devicechange", refresh);
-    return () => navigator.mediaDevices?.removeEventListener("devicechange", refresh);
-  }, [refresh]);
-
-  if (cameras.length === 0) return null;
-  const selected = cameras.some((c) => c.deviceId === value) ? value : "";
+  const [selected, setSelected] = useState(value ?? (OFFERS_PI_CAMERA ? "pi-usb" : "local-webcam"));
 
   return (
     <label className="cam-select" onClick={(e) => e.stopPropagation()}>
@@ -27,12 +11,10 @@ export function CameraSelect({ value, onChange }: { value: string | undefined; o
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3l2-2.5h8L18 7h3v12H3z" /><circle cx="12" cy="13" r="3.6" /></svg>
       <select
         value={selected}
-        onFocus={refresh}
-        onPointerDown={refresh}
-        onChange={(e) => { saveCameraId(e.target.value); onChange(e.target.value); }}
+        onChange={(e) => { setSelected(e.target.value); saveCameraId(e.target.value); onChange(e.target.value); }}
       >
-        {!selected && <option value="">Default camera</option>}
-        {cameras.map((c, i) => <option key={c.deviceId} value={c.deviceId}>{c.label || `Camera ${i + 1}`}</option>)}
+        {OFFERS_LAPTOP_WEBCAM && <option value="local-webcam">Laptop webcam</option>}
+        {OFFERS_PI_CAMERA && <option value="pi-usb">Pi USB camera (unit 5)</option>}
       </select>
     </label>
   );

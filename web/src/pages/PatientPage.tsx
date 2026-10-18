@@ -9,7 +9,7 @@ import { USE_MOCK_HAND } from "@/lib/cv";
 import { CameraSelect } from "@/components/patient/CameraSelect";
 import { AddWordDialog } from "@/components/patient/AddWordDialog";
 import { loadCameraId } from "@/lib/cameraPref";
-import { sounds } from "@/lib/sounds";
+import Brand from "@/components/Brand";
 import "@/components/patient/patient.css";
 import "@/components/patient/patient-theme.css";
 
@@ -19,7 +19,7 @@ export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraId, setCameraId] = useState(loadCameraId);
-  const { state, retrain, reloadCamera, dismiss, continueDemo, feedbackYes, feedbackNo, feedbackCorrect, feedbackSkip, retryRequest, enableSound, saveTraining, checkRequest, addWord, skipWord, setPaused } = useOnboarding(videoRef, canvasRef, cameraId);
+  const { state, retrain, reloadCamera, dismiss, continueDemo, feedbackYes, feedbackNo, feedbackCorrect, feedbackSkip, retryRequest, saveTraining, checkRequest, addWord, skipWord, setPaused } = useOnboarding(videoRef, canvasRef, cameraId);
   const { phase, patient, index, order, canSkip, progress, hint, lifting, trigger, result, flow, feedback, toast } = state;
   const [isAddingWord, setIsAddingWord] = useState(false);
   const requestLabels = patient.vocabulary.map((w) => w.label);
@@ -44,14 +44,6 @@ export default function PatientPage() {
     : flow.phase === "waiting_release" ? "Show your relaxed movement for a moment to begin."
     : deciding ? "Keep holding while the ring fills." : "Watching for a movement.";
 
-  // Browsers only allow sound after a user gesture. Any tap or key on the page unlocks the cues.
-  useEffect(() => {
-    const unlock = () => sounds.unlock();
-    window.addEventListener("pointerdown", unlock, { once: true });
-    window.addEventListener("keydown", unlock, { once: true });
-    return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
-  }, []);
-
   // Demo: after a request is sent, Space or a tap on the open screen goes straight back to Ready.
   const canContinue = phase === "listening" && !!flow.request && ["waiting_ack", "acknowledged", "waiting_release"].includes(flow.phase);
   useEffect(() => {
@@ -71,16 +63,21 @@ export default function PatientPage() {
   return (
     <main className="patient-design relative h-full overflow-hidden" onClick={onScreenClick}>
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
-        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
+        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" hidden={cameraId === "pi-usb"} />
+        {cameraId === "pi-usb" && <img className="pi-cam-preview" src="/camera.mjpg" alt="Pi USB camera preview" />}
         <HandCanvas ref={canvasRef} />
       </div>
       <div className="patient-toolbar">
+        <a className="brand-link patient-brand" href="/patient" aria-label="Beacon patient screen"><Brand view="Patient" overlay /></a>
         {!USE_MOCK_HAND && <CameraSelect value={cameraId} onChange={setCameraId} />}
-        <div className="patient-tools">
-          <button type="button" onClick={() => { void enableSound(); }}>{state.voice === "off" || state.voice === "blocked" ? "Enable sound" : "Enable sound again"}</button>
-          <span role="status">{state.voice === "off" ? "Sound is off" : state.voice === "browser" ? "Browser voice fallback" : state.voice === "blocked" ? "Sound blocked — tap Enable sound" : state.voice === "elevenlabs" ? "ElevenLabs audio" : "Sound ready"}</span>
-          {state.savingTraining && <button type="button" onClick={() => { void saveTraining(); }}>Retry training save</button>}
-        </div>
+        {(state.savingTraining || state.trainingPending > 0) && <div className="patient-tools training-save-status">
+          {state.savingTraining ? <p role="status">Saving training…</p> : <>
+            <div><p role="alert">Training not saved to server.</p>
+              <details className="training-save-details"><summary>Why?</summary><p>{state.trainingSaveError || "Training is waiting to save."}<br />Recording kept here. Keep this page open and retry.</p></details>
+            </div>
+            <button type="button" onClick={() => { void saveTraining(); }}>Retry training save</button>
+          </>}
+        </div>}
         <a className="patient-caregiver-link" href="/caregiver" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>Caregiver screen <span aria-hidden="true">↗</span></a>
         {canSkip && onboarding && phase !== "done" && (
           <div className="live-actions"><button type="button" className="btn-retrain" onClick={skipWord}>Not now</button></div>
@@ -124,8 +121,10 @@ export default function PatientPage() {
             )}
             {phase === "done" && (
               <>
-                <Ring progress={1} mode="done"><CheckMark /></Ring>
-                <p className="status">Saved<small>{hint}</small></p>
+                <Ring progress={1} mode={state.savingTraining || state.trainingPending ? "hold" : "done"} small>
+                  {state.savingTraining ? "Saving" : state.trainingPending ? "Recorded" : <CheckMark />}
+                </Ring>
+                <p className="status">{state.savingTraining ? "Saving training" : state.trainingPending ? "Movement recorded" : "Saved"}<small>{hint}</small></p>
               </>
             )}
           </div>
