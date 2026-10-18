@@ -1,5 +1,8 @@
 # Josh's arm check and alert demo
 
+For step 4, the patient gesture flow is connected at `/patient`.
+Setup and checks: [GESTURES.md](./GESTURES.md).
+
 Open `/src/cv/armDemo.html` in the web dev server.
 
 1. Start the camera and keep both arms in view.

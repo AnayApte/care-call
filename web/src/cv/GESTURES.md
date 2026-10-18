@@ -27,26 +27,25 @@ Training accuracy can look too high when examples come from one hold, so test fr
 - `adapt.ts` and `session.ts`: load approved settings and prepare session reports.
 - `personalDemo.ts`: working example of these pieces together.
 
-## Connect the patient page
+## Patient page
 
-Rey owns the page and server request wiring.
-Create the personal classifier once, then load its labeled samples:
+Step 4 is connected on `josh/patient-integration`, based on Rey's onboarding branch.
+Open `/patient` for the real camera flow. Train all five movements, then repeat one.
+The ring fills over 12 matching frames at confidence 0.8 or higher, followed by an
+eight-second cooldown. Rest never sends a request.
 
-```ts
-const personal = createPersonalClassifier(loadBundledBaseline());
-personal.setSamples(storedSamples);
-```
+`patient.ts` connects the personal classifier to the page. The page uses the same
+trigger engine as `useGestureTrigger`. It sends one request when the trigger fires
+and shows success only after the server accepts it.
 
-For each new camera frame:
+The training check uses leave-one-out scoring. It is not a measure of real-world
+accuracy; test new movements after recording.
 
-```ts
-const prediction = frame.vector ? personal.predict(frame.vector) : null;
-gesture.processPrediction(prediction, frame.timestamp);
-```
-
-Use the hook's `onTrigger` callback to send one request. Reset the hold when stopping
-or retraining. Recognition starts after all five labels have 15 examples.
-The default trigger needs 12 matching frames at confidence 0.8 or higher.
+For a local simulation, use `/patient?mock=1` in the dev server with a separate test
+database and messaging disabled. Keys: 0 rest, 1 water, 2 pain, 3 help, 4 bathroom,
+X hide the hand. Select each pose before pressing Start. This uses the real model
+and trigger with synthetic landmarks. It does not test the camera or physical hardware.
+Reset this test training before trying real movements. Simulation is disabled in production.
 
 Keep stored samples in the existing 42-number format. `personal.predict` handles
 Rey's model format internally. Alex should use the same conversion on the Pi.
@@ -55,7 +54,7 @@ keep the package and WASM versions matched. See `camera.ts` for download URLs.
 
 ## Checks
 
-18 tests, the TypeScript check and the demo build passed. Browser calculations
+33 tests, two server checks, the TypeScript check and the web build passed. Browser calculations
 match Rey's reference examples. Live webcam performance still needs testing.
 
 After installing the web dependencies, run these from the repo root:

@@ -27,6 +27,7 @@ export type OnboardingState = {
   handPresent: boolean;
   trigger: TriggerState;
   lastSent: Label | null;
+  accuracy: number | null;
   toast: { text: string; kind: "info" | "error" } | null;
 };
 
@@ -41,16 +42,17 @@ function completeLabels(samples: Sample[]): Set<Label> {
 export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, countdown: 0, progress: 0, hint: "", lifting: null,
-    handPresent: false, trigger: idleTrigger, lastSent: null, toast: null,
+    handPresent: false, trigger: idleTrigger, lastSent: null, accuracy: null, toast: null,
   });
 
-  // Mutable session state read by the 30 fps frame loop. Kept out of React state to avoid stale closures.
+  // Mutable session state read by the camera loop.
   const session = useRef({
     phase: "loading" as Phase,
     index: 0,
     samples: [] as Sample[],
     capture: null as ReturnType<typeof createSampleCapture> | null,
     holdStartedAt: 0,
+    captureStartedAt: 0,
     gate: createSteadinessGate(),
     classifier: createPersonalClassifier(),
     trigger: createGestureTrigger(),
@@ -106,7 +108,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         s.classifier.setSamples(s.samples);
         s.trigger.reset();
         s.listenGraceUntil = performance.now() + LISTEN_GRACE_MS;
-        setPhase("listening", { lifting: label, progress: 0, trigger: idleTrigger });
+        setPhase("listening", { lifting: label, progress: 0, trigger: idleTrigger, accuracy: s.classifier.leaveOneOutAccuracy() });
         return;
       }
       s.index += 1;
@@ -132,11 +134,14 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         patch({ progress: 0, hint: present ? "Hold still." : "Lost the hand, bring it back into the picture." });
         return;
       }
-      if (!s.capture) s.capture = createSampleCapture(TRAINING_ORDER[s.index], frame.timestamp);
+      if (!s.capture) {
+        s.captureStartedAt = frame.timestamp;
+        s.capture = createSampleCapture(TRAINING_ORDER[s.index], frame.timestamp);
+      }
       const result = s.capture.update(frame.vector, frame.timestamp);
       if (result.failed) { s.capture = null; patch({ progress: 0, hint: "Hold still." }); return; }
       if (result.done) { finishLabel(result.samples); return; }
-      patch({ progress: Math.min(1, (frame.timestamp - s.holdStartedAt) / HOLD_MS), hint: "Hold until the ring is full." });
+      patch({ progress: Math.min(1, (frame.timestamp - s.captureStartedAt) / HOLD_MS), hint: "Hold until the ring is full." });
       return;
     }
     if (s.phase === "listening") {
@@ -147,11 +152,11 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       patch({ trigger: next });
       if (next.fired) {
         const fired = next.fired;
-        patch({ lastSent: fired.label });
         void api.createRequest(fired.label, fired.confidence).then((r) => {
-          if (!r.ok) toast(`Could not send: ${r.error}`, "error");
+          if (!r.ok) { toast(`Could not send: ${r.error}`, "error"); return; }
+          patch({ lastSent: fired.label });
+          later(() => patch({ lastSent: null }), SENT_SHOW_MS);
         });
-        later(() => patch({ lastSent: null }), SENT_SHOW_MS);
       }
       return;
     }
@@ -167,11 +172,17 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (patientRes.ok) patch({ patient: patientRes.data });
       if (samplesRes.ok) s.samples = samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector }));
       else toast("Server unreachable, training will stay on this device", "error");
+      try {
+        s.classifier.setSamples(s.samples);
+      } catch {
+        s.samples = [];
+        s.classifier.setSamples([]);
+        toast("Saved training could not load. Please retrain movements.", "error");
+      }
       const done = completeLabels(s.samples);
       const firstMissing = TRAINING_ORDER.findIndex((l) => !done.has(l));
       if (firstMissing === -1) {
-        s.classifier.setSamples(s.samples);
-        setPhase("listening", { index: TRAINING_ORDER.length - 1 });
+        setPhase("listening", { index: TRAINING_ORDER.length - 1, accuracy: s.classifier.leaveOneOutAccuracy() });
       } else {
         s.index = firstMissing;
         setPhase("waiting", { index: firstMissing, hint: "Any movement they can repeat works." });
@@ -186,13 +197,15 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     if (!video) return;
     let stop: (() => void) | null = null;
     let cancelled = false;
+    const controller = new AbortController();
+    const trigger = session.current.trigger;
     startHandTracker(video, onFrame, (err) => {
       const name = err instanceof Error ? err.name : "";
       toast(name === "NotAllowedError" ? "Camera blocked. Allow camera access in the address bar and reload." : "No camera found or it is in use by another app.", "error");
-    }, () => toast("Hand model failed to load. Check the network and reload.", "error"))
+    }, () => toast("Hand model failed to load. Check the network and reload.", "error"), controller.signal)
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
-    return () => { cancelled = true; stop?.(); };
+    return () => { cancelled = true; controller.abort(); stop?.(); trigger.reset(); };
   }, [videoRef, onFrame, toast]);
 
   useEffect(() => () => { session.current.timers.forEach((id) => window.clearTimeout(id)); }, []);
@@ -201,9 +214,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     const s = session.current;
     s.timers.forEach((id) => window.clearTimeout(id));
     s.samples = [];
+    s.classifier.setSamples([]);
     s.index = 0;
     s.trigger.reset();
-    setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, lastSent: null, hint: "Any movement they can repeat works." });
+    setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, lastSent: null, accuracy: null, hint: "Any movement they can repeat works." });
     const r = await api.deleteSamples();
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
   }, [setPhase, toast]);

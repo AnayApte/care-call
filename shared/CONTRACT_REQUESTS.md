@@ -8,3 +8,5 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 
 2026-10-17 16:19 | josh | Josh changed his goal to observing stroke warning signs. Added an unvalidated guided arm-drop demo in his folder; it sends generic HELP through the existing API. Please update the shared plan and agree an observation payload; the confidence field currently holds pose visibility, never stroke probability. Alex owns real ESP32 testing. No diagnosis or all-clear claim.
 2026-10-17 19:05 | rey | Trigger min confidence 0.8 feels too strict with real hands in testing; propose 0.7 and a time-based 1 s hold with gentle drain instead of 12 consecutive frames | detection now runs at 30 fps so 12 frames is only 0.4 s, and one odd frame should not wipe the ring
+
+2026-10-17 | josh | Josh asked to complete step 4. Connected his CV code to Rey's patient page on josh/patient-integration; small bridge, onboarding and status-message edits are included for review. Camera runs at 12 fps with the current contract's hold and confidence settings. No server, hardware or model weights changed.

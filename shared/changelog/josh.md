@@ -13,3 +13,5 @@
 2026-10-17 | Clarified that the real ESP32 needs the public server URL; localhost is only for laptop testing.
 
 2026-10-17 | Pulled Rey's larger version 2 model, checked browser compatibility and added a model version label. All 29 JavaScript tests pass. Arm check unchanged.
+
+2026-10-17 | Connected step 4 to Rey's patient screen. Added real gesture recognition, training check and honest send status. Simulated training, Water request, device alert and failed send checked. 33 JavaScript tests, two server checks and web build pass. Live camera and hardware still need testing.

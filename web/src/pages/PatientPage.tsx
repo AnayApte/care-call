@@ -5,6 +5,7 @@ import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
 import { TRAINING_ORDER, DISPLAY_WORD } from "@/lib/labels";
+import { USE_MOCK_HAND } from "@/lib/cv";
 import "@/components/patient/patient.css";
 
 export default function PatientPage() {
@@ -59,17 +60,18 @@ export default function PatientPage() {
         <>
           <button type="button" className="btn-retrain" onClick={retrain}>Retrain movements</button>
           <h2 className="live-word">{liveWord ? DISPLAY_WORD[liveWord] : "Ready"}</h2>
-          <p className="live-sub">{lastSent ? "Request sent. Help is on the way." : liveWord ? "Keep holding to send the request." : "Watching for a movement. Make one and hold it."}</p>
+          <p className="live-sub">{lastSent ? "Request sent. Waiting for a caregiver." : liveWord ? "Keep holding to send the request." : "Watching for a movement. Make one and hold it."}</p>
           <div className="live-ring">
             <Ring progress={lastSent ? 1 : trigger.progress} mode={lastSent ? "done" : "hold"} large small>
-              {lastSent ? <CheckMark /> : trigger.cooldownMs > 0 ? "Sent" : trigger.label ? "Sending" : ""}
+              {lastSent ? <CheckMark /> : trigger.cooldownMs > 0 ? "Wait" : trigger.label ? "Hold" : ""}
             </Ring>
           </div>
-          <p className="notice">Assistive prototype, not a medical device.</p>
+          <p className="notice">{state.accuracy !== null && <>Training check: {Math.round(state.accuracy * 100)}% (leave-one-out).<br /></>}Assistive prototype, not a medical device.</p>
         </>
       )}
 
       {phase === "loading" && <div className="toast">Starting camera</div>}
+      {USE_MOCK_HAND && <p style={{ position: "fixed", top: 12, left: 12, zIndex: 50, background: "white", padding: 8, color: "black" }}>Simulation: 0 rest · 1 water · 2 pain · 3 help · 4 bathroom · X hide</p>}
       {toast && <div className={`toast ${toast.kind === "error" ? "error" : ""}`} role="status">{toast.text}</div>}
     </main>
   );
