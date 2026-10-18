@@ -13,3 +13,5 @@
 2026-10-18 | Added `/camera.mjpg` to the Pi frontend server, bound to the QNX USB camera unit 5, so a tunneled browser can consume Pi frames instead of Mac getUserMedia. Python syntax check passes. Logged the contract expansion and requested Rey-owned patient camera integration.
 
 2026-10-18 | Wired the patient page to use only the Pi USB camera stream for preview and MediaPipe input; it no longer requests local browser cameras. Built and deployed the frontend to the Pi. Verified the live patient page references the new bundle and `/camera.mjpg` returns HTTP 200 multipart camera frames. `npm run build`, `npm run test` (15 passing), and `git diff --check` pass.
+
+2026-10-18 | Reduced hotspot video payloads by resizing on the Pi to at most 320×240 and encoding JPEG at quality 55, and removed the extra server delay. Raised the browser tracker cap to 20 fps. Deployed both changes; Pi stream measurement was about 261 KB in 3 seconds (~87 KB/s), with a sample frame around 7 KB. Build, all 15 tests and syntax checks pass.

@@ -97,7 +97,7 @@ export async function startRealHandTracker(
       onFrame({ timestamp: now, vector: null, landmarks: null, handedness: null });
     } else if (detector && (piImage ? piImage.complete && piImage.naturalWidth > 0 : video.readyState >= 2 && video.currentTime !== lastVideoTime)) {
       if (piImage) {
-        if (now - lastVideoTime < 100) { raf = requestAnimationFrame(tick); return; }
+        if (now - lastVideoTime < 50) { raf = requestAnimationFrame(tick); return; }
         lastVideoTime = now;
       } else {
         lastVideoTime = video.currentTime;

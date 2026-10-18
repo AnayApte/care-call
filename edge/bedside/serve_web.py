@@ -2,7 +2,6 @@
 """Serve the built Care Call frontend on the Pi's local VNC browser."""
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-import time
 from urllib.parse import urlsplit
 
 DIST = Path(__file__).resolve().parents[2] / "web/dist"
@@ -43,7 +42,17 @@ class Frontend(SimpleHTTPRequestHandler):
         try:
             while True:
                 frame = camera.read()
-                ok, jpeg = cv2.imencode(".jpg", frame)
+                height, width = frame.shape[:2]
+                scale = min(1.0, 320 / width, 240 / height)
+                if scale < 1.0:
+                    frame = cv2.resize(
+                        frame,
+                        (max(1, round(width * scale)), max(1, round(height * scale))),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                ok, jpeg = cv2.imencode(
+                    ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 55]
+                )
                 if not ok:
                     continue
                 payload = jpeg.tobytes()
@@ -51,7 +60,6 @@ class Frontend(SimpleHTTPRequestHandler):
                                  + str(len(payload)).encode("ascii") + b"\r\n\r\n"
                                  + payload + b"\r\n")
                 self.wfile.flush()
-                time.sleep(0.03)
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
