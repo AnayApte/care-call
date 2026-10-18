@@ -33,3 +33,5 @@
 2026-10-17 | Added thumbs-up Yes and thumbs-down No to request feedback. Relax first, then hold for one second; the buttons still work. Nine thumb checks and three isolated frame/API flows passed, including learning from the original request rather than the thumb. Build, typecheck and lint pass with one existing warning. Real-camera testing remains.
 
 2026-10-17 | Removed shared-camera thumb feedback after Josh identified the patient/caregiver overlap. The camera cannot establish who answered. Kept caregiver Yes/No buttons and made their role clear. Simulated patient thumbs leave the prompt unanswered; manual Yes/No and corrections still work. Build, typecheck and changed-file lint pass.
+
+2026-10-18 | Added the 2.0 completion contract at Josh's request. Prioritizes the local camera, browser caregiver, hands-free request cycle and optional correctness feedback before hardware integration. Includes ownership, planned API changes and acceptance checklists. Updated agent entry points; original contract and fixtures are unchanged. Documentation only.
