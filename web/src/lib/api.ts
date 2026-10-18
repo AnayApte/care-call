@@ -1,7 +1,10 @@
 /** Thin client for the contract API (section 9). Every call returns a Result so a down server never crashes the UI. */
 import patientFixture from "../../../shared/fixtures/patient.json";
 
-export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
+const DEFAULT_API_BASE = import.meta.env.PROD
+  ? "https://care-call-production.up.railway.app"
+  : "http://localhost:8000";
+export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? DEFAULT_API_BASE;
 export const PATIENT_ID = "p_demo";
 
 export type VocabularyItem = { label: string; display: string; speech: string };
