@@ -21,9 +21,9 @@ No secret values are in this file. **Every live value is in Railway → `care-ca
 
 | Branch | What | State |
 | --- | --- | --- |
-| `main` | Everything in this guide: server, Photon bridge, TTS, Sentry, Gemini, phone-call code (off until section 13 is done), Pi scripts in `edge/` | Live on Railway after "Deploy latest commit" |
-
-No open branches from Anay. Pi scripts (`edge/`) were merged by Anay; Alex owns that folder from here.
+| `main` | Everything below except the two branches in this table | Live on Railway |
+| `anay/phone-call` | Phone call at 75 s (ElevenLabs agent over Photon SIP), `/api/webhooks/call`, full `server/.env.example`, handoff notes, this doc | Safe to merge: calls stay off until `ENABLE_PHONE_CALL=true`. Needs the setup in section 13. |
+| `anay/caregiver-pi` | `edge/caregiver/caregiver.py`, `edge/caregiver/test_lcd.py`, `edge/bedside/bedside.py` | Caregiver Pi tested live. **Alex: review and merge.** |
 
 ---
 
@@ -147,7 +147,7 @@ server/.venv/bin/python3 -m uvicorn server.main:app --port 8000
 | `routes/misc.py` | `/api/tts`, `/api/benchmark` |
 | `integrations/photon.py` | Sends texts through the bridge, phone number formatting, caregiver check |
 | `integrations/gemini.py` | Gemini answers with the last 24 h as context, model fallback |
-| `integrations/telephony.py` | Phone call through the ElevenLabs agent |
+| `integrations/telephony.py` | Phone call through the ElevenLabs agent (branch `anay/phone-call`) |
 | `photon-bridge/src/index.ts` | Node bridge: local `/send`, inbound loop → `/api/webhooks/photon`, polls |
 | `Dockerfile`, `start.sh` | Railway build and startup |
 
@@ -262,7 +262,7 @@ curl -X POST $B/api/tts -H 'Content-Type: application/json' -d '{"text":"Help is
 
 ---
 
-## 13. Phone call at 75 s (code on `main`, NOT finished: account setup needed)
+## 13. Phone call at 75 s (branch `anay/phone-call`, NOT finished: account setup needed)
 
 **Code (done, tested with a fake):** `integrations/telephony.place_call(request)` calls ElevenLabs `POST https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call` with:
 - the agent ID and imported phone number ID;
@@ -296,7 +296,7 @@ The agent's tool calls `POST /api/webhooks/call` (header `X-Bridge-Secret` = `DE
 
    Copy the **phone number ID**.
 4. **ElevenLabs API key:** add **ElevenAgents → Write** (it's TTS-only now).
-5. **Railway:** `ELEVENLABS_AGENT_ID`, `ELEVENLABS_AGENT_PHONE_NUMBER_ID`, `ENABLE_PHONE_CALL=true`. Deploy (⌘K → Deploy latest commit).
+5. **Railway:** `ELEVENLABS_AGENT_ID`, `ELEVENLABS_AGENT_PHONE_NUMBER_ID`, `ENABLE_PHONE_CALL=true`. Merge `anay/phone-call` and deploy.
 6. **Test:** create a request and ignore everything. Text at ~20 s, call at ~75 s. Say "yes, I'm going" and the request should become `acked_by: "call"`.
 
 If the call fails, Deploy Logs show `escalation.call failed … ElevenLabs outbound call failed (status): …`. The SIP part (steps 1 and 3) is the most likely problem, since the Photon voice docs are thin.
@@ -328,7 +328,7 @@ Runs on every boot because `SEED_DEMO=true`:
 
 ---
 
-## 16. Raspberry Pis (`edge/`, on `main`; Alex owns the folder)
+## 16. Raspberry Pis (`edge/`, branch `anay/caregiver-pi`; Alex owns the folder)
 
 Both use only the server. Settings in a `.env` next to each script: `SERVER_URL`, `DEVICE_TOKEN` (Railway value), `DEVICE_ID`.
 
