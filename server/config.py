@@ -52,4 +52,4 @@ TTS_CACHE_DIR = os.environ.get("TTS_CACHE_DIR", str(SERVER_DIR / "cache" / "tts"
 # Gemini answers free-text iMessage questions (contract section 10).
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 # Tried in order: a model that is overloaded (503) or retired (404) falls through to the next.
-GEMINI_MODELS = [m.strip() for m in os.environ.get("GEMINI_MODELS", "gemini-3.5-flash,gemini-flash-latest").split(",") if m.strip()]
+GEMINI_MODELS = [m.strip() for m in os.environ.get("GEMINI_MODELS", "gemini-3.5-flash,gemini-flash-latest,gemini-3.1-flash-lite").split(",") if m.strip()]
