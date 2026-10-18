@@ -3,6 +3,7 @@
 Updated: 2026-10-18
 
 Works:
+- One command for local dev: `web/scripts/dev-all.sh` (or `cd web && npm run dev:all`) runs server + web together; Ctrl+C stops both.
 - `web/` scaffolded: Vite 5, React, TS, Tailwind v4 (`@tailwindcss/vite`), shadcn. `npm run dev` then http://localhost:5173/patient. Tokens in `web/src/styles/tokens.css`.
 - `/patient` onboarding (training) flow built from mockup A1 (`web/mockups/`): flashcard deck, framed camera, tap Start, 3-2-1 countdown, 3 s hold gated on steadiness, auto-retry on hand loss, check sound per label, no summary, straight into listening. Samples POST to the server per label; reload resumes at the first incomplete label; "Retrain movements" DELETEs samples and restarts.
 - Feedback loop on /patient: after a request fires, "Was that the right request?" Yes / No, then "What did they mean?". Confirmed or corrected hold frames become new samples (newest 45 per label kept) and `POST /api/requests/{id}/feedback` is sent, so the model follows the person over time and the CREAO agent gets feedback.
