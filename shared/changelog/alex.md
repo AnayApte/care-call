@@ -21,3 +21,5 @@
 2026-10-18 | Caregiver button ACK now targets the request currently shown in the alert, preventing a stale press from acknowledging a newer request. Added backend regression assertions that the patient request poll sees `acked` and the bedside state reports the same button ACK. Server regression suite passes (11 tests). Pi OS install is pending SSH access; the documented host requires password authentication.
 
 2026-10-18 | Installed the merged caregiver script on the Pi OS device at 172.20.10.6 and restarted `carecall-caregiver`. Verified the remote script hash matches, systemd reports it active (exit status 0), and Railway caregiver heartbeat health returns HTTP 200.
+
+2026-10-18 | Pulled `main` to a3fffbd and updated `/data/home/qnxuser/care-call` on the QNX Pi with the tracked project plus a production frontend build. Preserved the Pi's local `.env` and `.venv`. Verified `/patient` serves, the bundle points to Railway, Railway health is `{"ok":true}` from QNX, and bedside Python files compile. Build, 15 web tests and 68 CV tests pass.
