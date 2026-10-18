@@ -137,9 +137,9 @@ export function createPersonalClassifier() {
 }
 
 /** Stand-in for Josh's trigger. Fills while the same request label is seen with enough confidence, drains gently
- * when it is not, so a single odd frame does not wipe the ring. Fires after three seconds of fill.
+ * when it is not, so a single odd frame does not wipe the ring. Fires after two seconds of fill.
  * Never fires on neutral. */
-const TRIGGER_HOLD_MS = 3000;
+const TRIGGER_HOLD_MS = 2000;
 const TRIGGER_GRACE_MS = 400; // a lost hand or a neutral frame is ignored this long, progress holds
 const TRIGGER_CONFLICT_GRACE_MS = 150; // a confident different word gets much less benefit of the doubt
 const TRIGGER_DRAIN_MS = 1500; // after the grace, progress drains at this rate
