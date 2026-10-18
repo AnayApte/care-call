@@ -17,13 +17,11 @@ No secret values are in this file. **Every live value is in Railway → `care-ca
   2. Never commit `.env` or keys. ElevenLabs auto-disables keys it finds on GitHub.
   3. `shared/contract.md` is the source of truth for API shapes.
 
-### Branches (as of ~8 PM Saturday)
+### State (Sunday ~9 AM)
 
-| Branch | What | State |
-| --- | --- | --- |
-| `main` | Everything below except the two branches in this table | Live on Railway |
-| `anay/phone-call` | Phone call at 75 s (ElevenLabs agent over Photon SIP), `/api/webhooks/call`, full `server/.env.example`, handoff notes, this doc | Safe to merge: calls stay off until `ENABLE_PHONE_CALL=true`. Needs the setup in section 13. |
-| `anay/caregiver-pi` | `edge/caregiver/caregiver.py`, `edge/caregiver/test_lcd.py`, `edge/bedside/bedside.py` | Caregiver Pi tested live. **Alex: review and merge.** |
+Everything is on `main` and deployed on Railway: server, Photon bridge, TTS (MP3 + WAV), Sentry, Gemini, Josh's software 2.0, Pi scripts in `edge/`. No open branches from Anay.
+Phone call: **not live** (Photon voice isn't available; Twilio needed a paid upgrade). Section 13 is kept for later.
+CREAO: code is live; needs `CREAO_API_KEY` (Josh's) + `CREAO_AGENT_ID=ed1ff383-9e8c-4472-82e9-c62ffe28da1f` + `ENABLE_CREAO=true` in Railway.
 
 ---
 
@@ -147,7 +145,7 @@ server/.venv/bin/python3 -m uvicorn server.main:app --port 8000
 | `routes/misc.py` | `/api/tts`, `/api/benchmark` |
 | `integrations/photon.py` | Sends texts through the bridge, phone number formatting, caregiver check |
 | `integrations/gemini.py` | Gemini answers with the last 24 h as context, model fallback |
-| `integrations/telephony.py` | Phone call through the ElevenLabs agent (branch `anay/phone-call`) |
+| `integrations/telephony.py` | Phone call through an ElevenLabs agent (not live) |
 | `photon-bridge/src/index.ts` | Node bridge: local `/send`, inbound loop → `/api/webhooks/photon`, polls |
 | `Dockerfile`, `start.sh` | Railway build and startup |
 
@@ -262,7 +260,7 @@ curl -X POST $B/api/tts -H 'Content-Type: application/json' -d '{"text":"Help is
 
 ---
 
-## 13. Phone call at 75 s (branch `anay/phone-call`, NOT finished: account setup needed)
+## 13. Phone call at 75 s (code on `main`, NOT live: Photon voice unavailable; kept for later)
 
 **Code (done, tested with a fake):** `integrations/telephony.place_call(request)` calls ElevenLabs `POST https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call` with:
 - the agent ID and imported phone number ID;
@@ -328,7 +326,7 @@ Runs on every boot because `SEED_DEMO=true`:
 
 ---
 
-## 16. Raspberry Pis (`edge/`, branch `anay/caregiver-pi`; Alex owns the folder)
+## 16. Raspberry Pis (`edge/`, on `main`; Alex owns the folder)
 
 Both use only the server. Settings in a `.env` next to each script: `SERVER_URL`, `DEVICE_TOKEN` (Railway value), `DEVICE_ID`.
 
@@ -351,6 +349,26 @@ Both use only the server. Settings in a `.env` next to each script: `SERVER_URL`
 - Speaker of any kind. Run `sudo apt install -y mpg123` once.
 - Downloads "Help is coming." from `/api/tts` once into `~/.carecall/`, then plays it **once per new `last_ack`**. It ignores acks from before it started.
 - Run the same way: `scp -r edge/bedside <user>@<ip>:~/bedside`, then `.env`, then `python3 bedside.py`.
+
+### Demo setup used on Sunday (caregiver Pi = button, light AND speaker)
+
+The caregiver Pi runs two programs:
+| Program | Device id | What |
+| --- | --- | --- |
+| `~/caregiver/caregiver.py` | `caregiver_1` | red + beep on alert, button acks, green on answered |
+| `~/voice/bedside.py` (downloaded from GitHub raw) | `caregiver_voice` | Sony SRS-XB12 over Bluetooth: says each new request ("I would like some water, please") and "Help is coming" once per ack |
+
+- **The patient laptop's sound stays off**, so each phrase is spoken once (by the Sony).
+- **Bluetooth on the Pi:**
+  1. `sudo rfkill unblock bluetooth`
+  2. `sudo apt install -y pipewire pipewire-pulse wireplumber libspa-0.2-bluetooth pulseaudio-utils mpg123`, then reboot.
+  3. Pair inside one `bluetoothctl` session **while `scan on` is running**: `pair` / `trust` / `connect 04:21:44:F0:F6:34`.
+- **Start the speaker program:** `cd ~/voice && PLAYER=mpg123 python3 bedside.py` (its `.env` has `SERVER_URL`, `DEVICE_TOKEN`, `DEVICE_ID=caregiver_voice`).
+- **Auto-start:** both run as systemd **user** services `carecall-caregiver` and `carecall-voice` (`loginctl enable-linger aboldt7191`).
+  - Logs: `journalctl --user -u carecall-voice -f`.
+  - The voice service runs `bluetoothctl connect <speaker>` before starting.
+- **Device ids in use:** `caregiver_1`, `caregiver_voice`, `bedside_1` (reserved for the QNX camera node, which should only `POST /api/requests` with `source:"edge"` and must not speak).
+- **QNX Pi:** no Bluetooth audio (QSBC is an SDK that needs a custom image). `/api/tts` supports `{"format":"wav"}` for QNX's `wave` player if a wired output is ever used.
 
 ### Pi troubleshooting
 
