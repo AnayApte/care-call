@@ -45,6 +45,13 @@ CREATE TABLE IF NOT EXISTS cv_sessions (
     synthetic INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS cv_live_sessions (
+    patient_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (patient_id, session_id)
+);
 CREATE TABLE IF NOT EXISTS feedback (
     n INTEGER PRIMARY KEY AUTOINCREMENT,
     request_n INTEGER NOT NULL,

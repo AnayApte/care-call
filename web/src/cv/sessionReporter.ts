@@ -17,6 +17,8 @@ export function createSessionReporter(apiBase: string, patientId: string, option
   let active = createSession(patientId, version, now());
   let pending: SessionSummary[] = [];
   let inFlight: Promise<void> | null = null;
+  let liveFlight: Promise<void> | null = null;
+  const published = new Map<string, string>();
   try {
     const saved: unknown = JSON.parse(options.storage?.getItem(key) ?? "[]");
     if (Array.isArray(saved)) pending = saved.filter((x): x is SessionSummary =>
@@ -58,6 +60,26 @@ export function createSessionReporter(apiBase: string, patientId: string, option
     },
     snapshot: () => active.snapshot(now()),
     pendingCount: () => pending.length,
+    publishLive(): Promise<void> {
+      if (liveFlight) return liveFlight;
+      const snapshots = [...pending, ...(active.hasData() ? [active.snapshot(now())] : [])];
+      liveFlight = (async () => {
+        for (const summary of snapshots) {
+          // A changing end time alone is not new practice. Retry failed updates.
+          const signature = JSON.stringify({ ...summary, ended_at: undefined });
+          if (published.get(summary.session_id!) === signature) continue;
+          const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/patients/${encodeURIComponent(patientId)}/live-session`, {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(summary), signal: AbortSignal.timeout(8000),
+          });
+          if (!response.ok) throw new Error(`Live usage update failed (${response.status})`);
+          published.set(summary.session_id!, signature);
+        }
+        const openIds = new Set([...pending.map(s => s.session_id), active.snapshot(now()).session_id]);
+        for (const id of published.keys()) if (!openIds.has(id)) published.delete(id);
+      })().finally(() => { liveFlight = null; });
+      return liveFlight;
+    },
     flush(): Promise<void> {
       // Rotate before awaiting HTTP so new attempts cannot be erased by a slow upload.
       seal();
@@ -66,7 +88,7 @@ export function createSessionReporter(apiBase: string, patientId: string, option
   };
 }
 
-/** Ten-minute reports, plus a best-effort report before the page goes away. */
+/** Live counts every two seconds; closed reports still cover ten-minute windows. */
 export function startSessionReporting(reporter: ReturnType<typeof createSessionReporter>, resetHold: () => void,
   onError: () => void) {
   let stopped = false;
@@ -74,6 +96,9 @@ export function startSessionReporting(reporter: ReturnType<typeof createSessionR
   const leave = () => { resetHold(); flush(); };
   const hide = () => { if (document.hidden) leave(); };
   const timer = window.setInterval(flush, 10 * 60 * 1000);
+  const liveTimer = window.setInterval(() => {
+    if (!document.hidden) void reporter.publishLive().catch(() => { /* Final reports retain their own retry queue. */ });
+  }, 2000);
   window.addEventListener("pagehide", leave);
   window.addEventListener("online", flush);
   document.addEventListener("visibilitychange", hide);
@@ -82,6 +107,7 @@ export function startSessionReporting(reporter: ReturnType<typeof createSessionR
   return () => {
     stopped = true;
     window.clearInterval(timer);
+    window.clearInterval(liveTimer);
     window.removeEventListener("pagehide", leave);
     window.removeEventListener("online", flush);
     document.removeEventListener("visibilitychange", hide);

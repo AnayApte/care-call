@@ -23,7 +23,14 @@ own private settings. Git does not carry keys to Railway.
 
 The agent receives the latest five session summaries and recent feedback.
 It receives no camera images or hand vectors. Use synthetic demo data for the demo.
-The reports save every ten minutes and when leaving the patient screen.
+Usage counts update automatically every few seconds while the patient page is open.
+Completed reports still save every ten minutes and when leaving the patient screen.
+A requested CREAO review includes the latest ongoing counts as well as saved reports.
+Refreshing the usage panel does not start a CREAO run.
+
+If the panel says CREAO is not connected despite saved private settings, check the
+server's launch settings: `ENABLE_CREAO=false` overrides `server/.env`. Restart
+with `ENABLE_CREAO=true`. This enables reviews; it does not start one.
 
 Missing setup or a failed run shows an error. The app never invents a report.
 Refresh resumes the same saved run. An outdated suggestion cannot overwrite

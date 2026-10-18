@@ -65,3 +65,13 @@ Camera preview fix (2026-10-18): moved the shading off the live video into a sep
 layer. The local patient page at port 5181 shows live video again; Josh confirmed
 his image and the hand dots are visible. This verifies the preview and tracking,
 not gesture accuracy or a complete request cycle. Typecheck and production build pass.
+
+Live usage update (2026-10-18): patient counts publish every two seconds; the
+caregiver page checks every three seconds. Ongoing and saved reports count once.
+Verified on ports 5181/8007: the open caregiver page changed from 4 attempts / 2
+requests to 5 / 3, including an ongoing session, without Refresh.
+Restarted the same local server with CREAO enabled and the existing private key.
+The review button is enabled. No new paid run was started; this is a setup check.
+Synced Rey's custom-word update from main; usage includes added words too.
+64 CV checks, 15 hand/word checks, 26 server checks, typecheck, changed-file lint
+and build pass.

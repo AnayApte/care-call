@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { API_BASE, PATIENT_ID } from "../lib/api";
-import { createAdaptationClient, reviewFrom, settingsFrom, type Job, type Settings } from "../lib/adaptation";
+import { API_BASE, PATIENT_ID, type VocabularyItem } from "../lib/api";
+import { createAdaptationClient, reviewFrom, settingsFrom, type Job, type Settings, type UsageSession } from "../lib/adaptation";
 import { reportPath, reportStore, reportSummary, type SavedReport } from "../lib/reports";
-import { DISPLAY_WORD } from "../lib/labels";
+import { displayWord } from "../lib/labels";
 import { LABELS } from "../cv/types";
-import type { SessionSummary } from "../cv/session";
 import ReportSummary from "../components/ReportSummary";
 import RequestInbox from "../components/RequestInbox";
 import "./caregiver.css";
@@ -27,28 +26,48 @@ export default function CaregiverPage() {
   const [job, setJob] = useState<Job | null>(() => loadJob(storageKey));
   const [phase, setPhase] = useState<Phase>(() => loadJob(storageKey) ? "pending" : "idle");
   const [current, setCurrent] = useState<Settings | null>(null);
-  const [reports, setReports] = useState<SessionSummary[]>([]);
+  const [reports, setReports] = useState<UsageSession[]>([]);
+  const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([]);
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [lastReport, setLastReport] = useState<SavedReport | null>(() => savedReports.read());
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [error, setError] = useState("");
+  const [refreshError, setRefreshError] = useState("");
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [notice, setNotice] = useState("");
   const busy = useRef(false);
   const refreshId = useRef(0);
+  const refreshing = useRef(false);
   const cancelRefresh = useCallback(() => { refreshId.current++; }, []);
 
   const refresh = useCallback(async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
     const id = ++refreshId.current;
     try {
-      const [settings, sessions, setup] = await Promise.all([client.current(), client.reports(), client.setup()]);
+      const [settings, sessions, setup, patient] = await Promise.all([client.current(), client.usage(), client.setup(), client.vocabulary()]);
       if (id !== refreshId.current) return;
-      setCurrent(settings); setReports(sessions); setReady(setup.ready); setLoaded(true); setError("");
+      setCurrent(settings); setReports(sessions); setReady(setup.ready); setLoaded(true); setRefreshError(""); setLastUpdate(new Date());
+      setVocabulary(patient.vocabulary);
       setLastReport(savedReports.read());
-    } catch (e) { if (id === refreshId.current) { setError(errorText(e)); setLoaded(true); } }
+    } catch (e) { if (id === refreshId.current) { setRefreshError(errorText(e)); setLoaded(true); } }
+    finally { refreshing.current = false; }
   }, [client, savedReports]);
 
-  useEffect(() => { void refresh(); return cancelRefresh; }, [refresh, cancelRefresh]);
+  useEffect(() => {
+    const update = () => { if (!document.hidden) void refresh(); };
+    update();
+    const timer = window.setInterval(update, 3000);
+    window.addEventListener("focus", update);
+    window.addEventListener("online", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      cancelRefresh(); window.clearInterval(timer);
+      window.removeEventListener("focus", update); window.removeEventListener("online", update);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [refresh, cancelRefresh]);
   useEffect(() => {
     try {
       if (job) localStorage.setItem(storageKey, JSON.stringify(job));
@@ -91,9 +110,12 @@ export default function CaregiverPage() {
     setNotice("Stopped waiting. Current settings have not changed. The run may still finish in CREAO.");
   }
 
-  const synthetic = reports.some(r => (r as SessionSummary & { synthetic?: boolean }).synthetic);
+  const synthetic = reports.some(r => r.synthetic);
+  const liveCount = reports.filter(r => r.live).length;
   const summary = lastReport ? reportSummary(lastReport) : null;
-  const totals = REQUEST_LABELS.map(label => ({ label,
+  const labels = [...new Set<string>([...REQUEST_LABELS, ...vocabulary.map(w => w.label),
+    ...reports.flatMap(r => Object.keys(r.labels))])].filter(label => label !== "neutral");
+  const totals = labels.map(label => ({ label,
     attempts: reports.reduce((n, r) => n + (r.labels[label]?.attempts ?? 0), 0),
     fired: reports.reduce((n, r) => n + (r.labels[label]?.fired ?? 0), 0),
   }));
@@ -102,20 +124,23 @@ export default function CaregiverPage() {
     <div className="cg-heading"><div><p className="cg-eyebrow">CAREGIVER</p><h1>A little easier, together.</h1><p>Answer Maria’s requests, then review her recent practice.</p></div>
       <button className="cg-button cg-secondary" onClick={() => { void refresh(); }} disabled={phase === "starting"}>Refresh</button></div>
     {error && <p className="cg-message cg-error" role="alert">{error}</p>}
+    {refreshError && <p className="cg-message cg-error" role="alert">Usage updates paused. Showing the last received report. {refreshError}</p>}
     {notice && <p className="cg-message" role="status">{notice}</p>}
     {!loaded && <p role="status">Loading recent practice…</p>}
     <RequestInbox />
     <div className="cg-grid">
       <section className="cg-card"><p className="cg-eyebrow">01 / RECENT PRACTICE</p><h2>The usage report</h2>
-        <p>Latest {reports.length} saved sessions. A request sends after a movement is held steadily.</p>
+        <p>Latest {reports.length} practice sessions{liveCount ? ` · ${liveCount} not yet closed` : ""}. Includes ongoing practice.</p>
+        <p className="cg-current">{refreshError ? "Updates paused" : "Updates automatically every few seconds"}{lastUpdate && ` · checked ${lastUpdate.toLocaleTimeString()}`}</p>
         {synthetic && <p className="cg-tag">Includes synthetic demo data</p>}
         <div className="cg-metrics"><div><strong>{totals.reduce((n, x) => n + x.attempts, 0)}</strong><span>movement attempts</span></div><div><strong>{totals.reduce((n, x) => n + x.fired, 0)}</strong><span>requests triggered</span></div></div>
-        <table><thead><tr><th>Movement</th><th>Attempts</th><th>Triggered</th></tr></thead><tbody>{totals.map(x => <tr key={x.label}><th>{DISPLAY_WORD[x.label]}</th><td>{x.attempts}</td><td>{x.fired}</td></tr>)}</tbody></table>
-        {reports.length ? <details><summary>See saved session details</summary><pre>{JSON.stringify(reports, null, 2)}</pre></details> : <p>No sessions yet. Practice on the patient screen; reports save every ten minutes and when leaving the page.</p>}
+        <table><thead><tr><th>Movement</th><th>Attempts</th><th>Triggered</th></tr></thead><tbody>{totals.map(x => <tr key={x.label}><th>{displayWord(x.label, vocabulary)}</th><td>{x.attempts}</td><td>{x.fired}</td></tr>)}</tbody></table>
+        {reports.length ? <details><summary>See session details</summary><pre>{JSON.stringify(reports, null, 2)}</pre></details> : <p>No practice yet. New movement attempts will appear here automatically.</p>}
       </section>
       <section className="cg-card"><p className="cg-eyebrow">02 / YOUR CHOICE</p><h2>Review with CREAO</h2>
         <p>A short summary here. The full explanation and your choices are one click away.</p>
         {loaded && !ready && <p className="cg-message">CREAO is not connected yet. Gesture recognition still works with the current settings.</p>}
+        {loaded && ready && <p className="cg-current">CREAO is configured. A review starts only when you ask; settings change only after Apply.</p>}
         {!job && <button className="cg-button" disabled={!ready || !current || phase === "starting" || !reports.length} onClick={() => { void start(); }}>{phase === "starting" ? "Starting review…" : "Ask CREAO to review"}</button>}
         {job && phase === "pending" && <p className="cg-message" role="status">CREAO is reviewing the report. We’ll show a short summary when it’s ready.</p>}
         {job && phase === "paused" && <button className="cg-button" onClick={() => { setError(""); setPhase("pending"); }}>Check the same run again</button>}
