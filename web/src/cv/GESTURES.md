@@ -34,6 +34,12 @@ Open `/patient` for the real camera flow. Train all five movements, then repeat 
 The ring fills over 12 matching frames at confidence 0.8 or higher, followed by an
 eight-second cooldown. Rest never sends a request.
 
+After a request, relax the same hand you trained with, then hold thumbs up for
+Yes or thumbs down for No for one second. A small bar shows the hold. No opens
+the correction choices. The buttons still work. These two poses need no recording;
+they only answer the feedback prompt and do not become request examples.
+Real-camera thumb recognition still needs a hands-on check.
+
 `patient.ts` connects the personal classifier to the page. The page uses the same
 trigger engine as `useGestureTrigger`. It sends one request when the trigger fires
 and shows success only after the server accepts it.

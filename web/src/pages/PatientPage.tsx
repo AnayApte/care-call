@@ -16,7 +16,7 @@ export default function PatientPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraId, setCameraId] = useState(loadCameraId);
   const { state, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect } = useOnboarding(videoRef, canvasRef, cameraId);
-  const { phase, index, order, progress, hint, lifting, trigger, result, delivery, feedback, toast } = state;
+  const { phase, index, order, progress, hint, lifting, trigger, result, delivery, feedback, feedbackHand, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
 
@@ -94,9 +94,11 @@ export default function PatientPage() {
                 <>
                   <p>Was that the right request?</p>
                   <div className="row">
-                    <button type="button" className="fb yes" onClick={feedbackYes}>Yes</button>
-                    <button type="button" className="fb" onClick={feedbackNo}>No</button>
+                    <button type="button" className="fb yes" onClick={feedbackYes}>👍 Yes</button>
+                    <button type="button" className="fb" onClick={feedbackNo}>👎 No</button>
                   </div>
+                  <p className="feedback-hand-hint">{feedbackHand.ready ? "Hold thumbs up for Yes or thumbs down for No for one second." : "Relax your hand first, then hold 👍 or 👎 for one second."}</p>
+                  <progress className="feedback-hand-progress" value={feedbackHand.progress} max={1} aria-label={feedbackHand.choice ? `Hold to answer ${feedbackHand.choice}` : "Thumb hold progress"} />
                 </>
               ) : (
                 <>

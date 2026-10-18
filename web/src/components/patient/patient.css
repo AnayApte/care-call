@@ -110,6 +110,11 @@
 .feedback .fb:active { transform: scale(0.96); }
 .feedback .fb.yes { background: var(--pine); border-color: var(--pine); color: #fff; }
 .feedback .fb.quiet { color: var(--mute); }
+.feedback .feedback-hand-hint { max-width: 34ch; margin: 14px auto 8px; color: var(--mute); font-size: 15px; font-weight: 400; line-height: 1.4; }
+.feedback-hand-progress { display: block; width: 100%; height: 6px; border: 0; border-radius: 999px; overflow: hidden; background: var(--paper-3); accent-color: var(--pine); }
+.feedback-hand-progress::-webkit-progress-bar { background: var(--paper-3); }
+.feedback-hand-progress::-webkit-progress-value { background: var(--pine); }
+.feedback-hand-progress::-moz-progress-bar { background: var(--pine); }
 @keyframes feedback-in {
   from { opacity: 0; transform: translate(-50%, -12px); }
   to { opacity: 1; transform: translate(-50%, 0); }
