@@ -94,7 +94,7 @@ export default function PatientPage() {
         )}
       </div>
       {state.cameraError && <div className="patient-warning" role="alert">{state.cameraError} <button type="button" onClick={reloadCamera}>Reload camera</button></div>}
-      {flow.error && <div className="patient-warning delivery-warning" role="alert">{flow.error}
+      {(flow.error || flow.phase === "delivery_unknown") && <div className="patient-warning delivery-warning" role="alert">{flow.error || "Checking that the request reached the caregiver…"}
         {(flow.phase === "delivery_unknown" || flow.phase === "failed") && <button type="button" onClick={() => { void retryRequest(); }}>Retry same request</button>}
         {flow.phase === "waiting_ack" && <button type="button" onClick={() => { void checkRequest(); }}>Check for help</button>}
         {flow.phase === "failed" && <button type="button" onClick={dismiss}>Return to listening</button>}
