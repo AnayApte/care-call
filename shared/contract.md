@@ -16,10 +16,10 @@ We are building an assistive prototype, NOT a medical device. Never claim otherw
 1. Patient screen (`/patient`): camera on. Guided training: for each request word (water, pain, help, bathroom) plus "neutral", hold your movement for 3 seconds. A small personal classifier is built in the browser.
 2. Patient makes the movement and holds it about 1 second. A progress ring fills, then a request is created: `POST /api/requests`.
 3. Bedside speaks the request aloud (ElevenLabs audio, pre-generated).
-4. Caregiver ESP32 unit (and `/caregiver` dashboard) alerts: buzzer, LED, OLED shows the word.
-5. Caregiver presses the button: `POST /api/device/ack`. Bedside says "Help is coming."
+4. Caregiver Pi unit (and `/caregiver` dashboard) alerts: buzzer, red LCD backlight, LCD shows the word.
+5. Caregiver presses the button: `POST /api/device/ack`. The bedside Pi (and the patient page) sees the ack and says "Help is coming."
 
-Definition of MVP: steps 1 to 5 working live on the venue network (or a phone hotspot) with the real ESP32 (or the `/beacon` phone fallback).
+Definition of MVP: steps 1 to 5 working live on the venue network (or a phone hotspot) with the real caregiver Pi (or the `/beacon` phone fallback).
 
 Layers, in priority order, each independently cuttable:
 - L2 iMessage (Photon): caregiver gets a text, can reply "1" or "on my way" to acknowledge, and can ask for status.
@@ -37,18 +37,21 @@ Evidence: `/benchmark` compares the personal model to the generic MediaPipe gest
 ## 4. Architecture (keep it dumb)
 
 ```
-Browser (web/)  --events-->  Server (server/, public HTTPS)  <--poll-- ESP32 (firmware/)
-  camera + MediaPipe             FastAPI + SQLite                      button, buzzer, LED, OLED
+Browser (web/)  --events-->  Server (server/, public HTTPS)  <--poll-- Caregiver Pi (edge/caregiver/)
+  camera + MediaPipe             FastAPI + SQLite                      button, buzzer, Grove LCD
+                                                               <--poll-- Bedside Pi (edge/bedside/)
+                                                                         camera, speaker: "Help is coming"
   personal kNN (in browser)      escalation timer, TTS, Photon,
                                  CREAO, Sentry
-Pi/QNX edge node (edge/)  --events-->  Server    (stretch)
+Bedside Pi gesture node (edge/bedside/)  --events-->  Server    (stretch, source "edge")
 Server  <--localhost HTTP-->  Photon bridge (server/photon-bridge/, Node + spectrum-ts)  <-->  iMessage
 ```
 - Photon only ships a TypeScript SDK (`spectrum-ts`), so a small Node bridge runs in the same Railway container as the Python server. Python calls it to send; it forwards inbound messages to `POST /api/webhooks/photon`. Only one bridge may run against the Photon project at a time (every running bridge receives and answers every message).
 - Server is deployed to a public HTTPS host (Railway or Render) by Anay by 5:15 PM. Everything talks to it. This avoids venue Wi-Fi device-to-device blocking.
 - Web is deployed to Vercel. Local dev points at the deployed server or localhost via `VITE_API_BASE`.
 - The classifier runs in the browser (kNN). The server stores samples and requests, nothing heavy.
-- ESP32 polls once per second. No websockets, no MQTT.
+- Both Pis poll once per second over plain HTTPS. They never talk to each other directly (venue Wi-Fi blocks device-to-device traffic); the server relays everything. No websockets, no MQTT.
+- We dropped the ESP32 on purpose (Pis are easier to program and we have two); this means we do not compete for the Espressif track.
 
 ## 5. Stack (locked; do not add libraries without a CONTRACT_REQUESTS line)
 
@@ -56,15 +59,15 @@ Server  <--localhost HTTP-->  Photon bridge (server/photon-bridge/, Node + spect
 | --- | --- |
 | Server | Python 3.11+, FastAPI, SQLite via SQLModel or sqlite3, httpx, sentry-sdk, run with `python3 -m uvicorn` inside a venv |
 | Web | Vite 5 (`npm create vite@5`), React, TypeScript, Tailwind v4 with `@tailwindcss/vite`, shadcn/ui, `@mediapipe/tasks-vision`, `@sentry/react` |
-| Firmware | ESP32-S3, Arduino framework (PlatformIO or Arduino IDE), ArduinoJson, Adafruit SSD1306 + GFX, WiFiClientSecure with `setInsecure()` (prototype only; disclose) |
-| Edge | Python 3 on the Pi, OpenCV; the QNX AI module is decided by Alex after talking to QNX |
+| Caregiver unit | Raspberry Pi, Python 3, `requests` (or `httpx`), `gpiozero` for the Grove button and buzzer, the Grove LCD library for the backlight display |
+| Bedside unit | Raspberry Pi with camera, Python 3, OpenCV; speaker for "Help is coming"; the QNX AI module is decided by Alex after talking to QNX |
 | Voice | ElevenLabs text-to-speech via the server only |
 | Messaging | Photon iMessage via the server only: `server/photon-bridge/` (Node 20, `spectrum-ts`, `tsx`) |
 | Handoff agent | CREAO agent on agent.creao.ai, called from the server via API Trigger |
 | Observability | Sentry (server + web) |
 | LLM for iMessage status Q&A | Gemini API (fast), NOT CREAO (CREAO runs take minutes) |
 
-Secrets live only in `server/.env` and Vercel env vars. Never in the browser or firmware repo code. Never commit `.env`. The only secret on the ESP32 is `DEVICE_TOKEN` and Wi-Fi credentials, kept in `firmware/secrets.h` (gitignored).
+Secrets live only in `server/.env` and Vercel env vars. Never in the browser or firmware repo code. Never commit `.env`. The only secrets on the Pis are `DEVICE_TOKEN` and Wi-Fi credentials, kept in `edge/.env` (gitignored).
 
 ## 6. Folder ownership (the main merge-conflict defence)
 
@@ -78,7 +81,7 @@ You may only edit files in your own folders. Need a change elsewhere? Message th
 | `server/integrations/creao.py`, `server/integrations/telephony.py` | Rey |
 | `web/` (everything except `web/src/cv/`) | Rey |
 | `web/src/cv/`, `benchmark/` | Josh |
-| `firmware/`, `edge/` | Alex |
+| `edge/caregiver/`, `edge/bedside/` (and `firmware/` if ever needed) | Alex |
 | `agents/<name>.md` | each person owns their own file |
 | `docs/`, README sections | whoever writes them; use separate files `docs/<name>.md` |
 | `shared/status/<name>.md`, `shared/changelog/<name>.md` | each person owns their own file |
@@ -93,7 +96,7 @@ Alex has CV experience and is the CV reviewer: Alex does a 20 minute pairing wit
 - Branch per person: `anay/...`, `rey/...`, `josh/...`, `alex/...`. Small PRs into `main`. Squash merge.
 - `git pull --rebase origin main` before every push. Never force-push `main`.
 - Push to your branch and merge a small PR to `main` at least once an hour, on the hour (4:00, 5:00, 6:00 ...) until the 12:30 AM freeze. Small and often beats big and late. Commit at least every 30 to 45 minutes. Message format: `area: what changed`.
-- Create the root `.gitignore` BEFORE the first commit (provided). Never commit `.env`, `secrets.h`, `node_modules`, `.venv`, model files.
+- Create the root `.gitignore` BEFORE the first commit (provided). Never commit `.env`, `edge/.env`, `secrets.h`, `node_modules`, `.venv`, model files.
 - Final code freeze is 8:00 AM Sunday. 8:00 to 11:00 AM is reserved for the demo video, README, track evidence and Devpost; only bug fixes merge after 8:00 AM. Submit target 11:00 AM, with 11:00 to 12:00 as buffer.
 - Merge freezes: see the plan doc. After 12:30 AM only Josh (4 to 6 AM) and the morning crew merge, and only to their own folders.
 - If a merge conflict happens, the file's owner resolves it. Do not "fix" someone else's file.
@@ -117,18 +120,20 @@ Request:
  "created_at":"ISO8601","acked_at":null,"acked_by":null,"ack_latency_ms":null}
 ```
 `status`: `open` or `acked`. `escalation_level`: 0 none, 1 message sent, 2 call placed. `acked_by`: `button`, `dashboard`, `imessage`, `call`.
-DeviceState (what the ESP32 polls):
+DeviceState (what both Pis and `/beacon` poll):
 ```json
-{"device_id":"beacon_1","mode":"alert","active_request":{"id":"r_1","display":"Water","created_at":"ISO8601"},"message":null}
+{"device_id":"caregiver_1","mode":"alert","active_request":{"id":"r_1","display":"Water","created_at":"ISO8601"},"message":null,
+ "last_ack":null}
 ```
-`mode`: `idle`, `alert`, `acked`. When acked, `message` is a short string like "On the way" shown for 5 seconds on the OLED, and `active_request` is still the request that was just acked.
+Device ids: `caregiver_1` (caregiver Pi), `bedside_1` (bedside Pi), `beacon_1` (`/beacon` page).
+`mode`: `idle`, `alert`, `acked`. When acked, `message` is a short string like "On the way" shown for 5 seconds on the LCD, and `active_request` is still the request that was just acked. `last_ack` is `{request_id, display, acked_at, acked_by}` for the most recent ack in the last 120 s, else `null`; the bedside Pi says "Help is coming" once per new `last_ack.request_id`, so a missed poll never loses it.
 
 ## 9. HTTP API (all JSON unless noted; base URL is `PUBLIC_BASE_URL`)
 
 | Method and path | Who calls | Purpose |
 | --- | --- | --- |
 | `GET /health` | Sentry Uptime | 200 if server is up |
-| `GET /api/device/health` | Sentry Uptime | 200 if a device heartbeat arrived in the last 15 s, else 503 |
+| `GET /api/device/health?device_id=` | anyone | 200 if that device (or, without `device_id`, any device) sent a heartbeat in the last 15 s, else 503; includes `devices: {id: seconds_since_heartbeat}` |
 | `GET /api/patients/{id}` | web | patient and vocabulary |
 | `GET /api/patients/{id}/samples` | web | all stored samples |
 | `POST /api/patients/{id}/samples` | web | store one sample `{label, vector}` |
@@ -136,9 +141,9 @@ DeviceState (what the ESP32 polls):
 | `POST /api/requests` | web, edge | body `{patient_id,label,confidence,source}` creates a request, starts escalation, returns the Request |
 | `GET /api/requests?patient_id=&since=` | web | list, newest first; `since` is an ISO timestamp |
 | `POST /api/requests/{id}/ack` | web | body `{by}` acknowledge from the dashboard |
-| `GET /api/device/state?device_id=` | ESP32 | header `X-Device-Token`; returns DeviceState |
-| `POST /api/device/ack` | ESP32 | header `X-Device-Token`; body `{device_id}`; acks the active request with `by:"button"`; 409 if nothing is open (ignore it) |
-| `POST /api/device/heartbeat` | ESP32 | header `X-Device-Token`; body `{device_id,rssi}` |
+| `GET /api/device/state?device_id=` | Pis, `/beacon` | header `X-Device-Token`; returns DeviceState |
+| `POST /api/device/ack` | caregiver Pi, `/beacon` | header `X-Device-Token`; body `{device_id}`; acks the active request with `by:"button"`; 409 if nothing is open (ignore it) |
+| `POST /api/device/heartbeat` | both Pis | header `X-Device-Token`; body `{device_id,rssi}` |
 | `POST /api/tts` | web | body `{text}`; returns `audio/mpeg`; cached on disk by hash |
 | `POST /api/webhooks/photon` | Photon bridge | header `X-Bridge-Secret`; body `{from, text, request_id?}` (`request_id` set on a poll tap); returns `{reply}` for the bridge to send back |
 | `POST /api/cv/sessions` | web | store one gesture session summary (section 19) |
@@ -166,15 +171,15 @@ Errors: JSON `{"error":"message"}` with a correct HTTP status. The web UI must h
 
 ### Fallback and optional hardware
 
-- Only the Pi, its camera and the ESP32 are guaranteed. Gesture recognition always runs in the browser on a laptop or phone webcam; the Pi is only for the optional edge node.
-- If the ESP32 or beacon is not working, set `ESCALATE_MESSAGE_AFTER_S=0` so the iMessage goes out immediately and is the main alert. Build iMessage before the bedside voice so it works by the 6:30 PM checkpoint.
+- Only the two Pis and the Pi camera are guaranteed. Gesture recognition always runs in the browser on a laptop or phone webcam; the bedside Pi camera is only for the optional edge node.
+- If the caregiver Pi or beacon is not working, set `ESCALATE_MESSAGE_AFTER_S=0` so the iMessage goes out immediately and is the main alert. Build iMessage before the bedside voice so it works by the 6:30 PM checkpoint.
 - Extra bedside hardware (speaker or screen reading `/api/device/state`) is optional. Alex asks MLH at 5 PM. Go/no-go at the 6:30 PM checkpoint: only if the golden path works end to end and the hardware is in hand by 7:00 PM. Hard stop at 9 PM; if it is not working by then, drop it. Nothing new after the 12:30 AM freeze.
 
 ## 11. Sentry (Anay sets up, everyone keeps it healthy)
 
 - Server: `sentry_sdk.init` with FastAPI integration, traces on, logs on. Custom spans: `request.create`, `escalation.message`, `escalation.call`, `request.ack`. Set tag `latency_ms` on ack.
 - Web: `@sentry/react`, browser tracing, Session Replay on.
-- Uptime monitors: `/health` and `/api/device/health`.
+- Uptime monitors: not used. Sentry caps uptime monitors per domain and `*.railway.app` is full. We use Tracing, Logs, Profiling and AI agent monitoring instead.
 - Everyone: when you hit a real bug that a trace, log or replay helped you find, screenshot it and drop it in `docs/sentry-evidence/` with a one-line caption. This is our Sentry judging story; do not fake it.
 
 ## 12. Environment variables (`server/.env`, example in `.env.example`)
@@ -187,7 +192,7 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 
 - `shared/fixtures/request_open.json`, `device_state_alert.json`, `device_state_idle.json`, `patient.json`.
 - Until the real piece exists, build against fixtures: Rey uses `web/src/cv/mock.ts` (Josh replaces it) with a button that fires a fake request; Alex uses `curl` against fixtures or a tiny local mock server until Anay's server is live (Anay posts the public URL in the group chat by 5:15 PM).
-- `/beacon` (Rey): a phone-friendly page that behaves like the ESP32 (polls device state, shows the word, beeps, big ACK button). This is the safety net if hardware fails. It must exist by 6:30 PM.
+- `/beacon` (Rey): a phone-friendly page that behaves like the caregiver Pi (polls device state, shows the word, beeps, big ACK button). This is the safety net if hardware fails. It must exist by 6:30 PM.
 
 ## 14. Design (Rey owns, kept simple)
 
@@ -198,11 +203,10 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 
 ## 15. Hardware spec (Alex owns)
 
-- Hardware we actually have (MLH rental): Grove LCD RGB Backlight (I2C, 16x2; use it instead of an OLED, and its backlight colour replaces the LEDs: red alert, green acked, dim idle), Grove button x2, Grove buzzer, Grove and plain jumper wires (6 of each kind), breadboard, about 10 resistors, Logitech webcam, Google Nest Mini (Bluetooth speaker, paired to the laptop that runs the patient page), Raspberry Pi 4 kit plus our HiPi board, ESP32-S3. No LED socket kit.
-- Pins in `firmware/pins.h` (check the S3 board's own pin numbers). Components: button (INPUT_PULLUP, debounced), active buzzer, I2C Grove LCD (power from the 5V pin; test it first, and if the display is garbled add a level shifter or check the module version).
-- Loop: every 1 s `GET /api/device/state`; `alert` → buzzer pattern, backlight red, LCD shows `display`; `acked` → backlight green, LCD shows `message` for 5 s; `idle` → backlight dim, LCD shows "Ready". Every 5 s `POST /api/device/heartbeat`. Button press → `POST /api/device/ack`.
-- Must keep working if Wi-Fi drops: show "OFFLINE" on the LCD and reconnect in a loop.
-- Edge (stretch): Python on the Pi captures a camera frame, runs hand landmarks, and posts the same Request with `source:"edge"`. Gate: only continue if QNX boots with the camera working by 5 PM.
+- Hardware we actually have (MLH rental): Grove LCD RGB Backlight (I2C, 16x2; use it instead of an OLED, and its backlight colour replaces the LEDs: red alert, green acked, dim idle), Grove button x2, Grove buzzer, Grove and plain jumper wires (6 of each kind), breadboard, about 10 resistors, Logitech webcam, Google Nest Mini (Bluetooth speaker, paired to the laptop that runs the patient page), Raspberry Pi 4 kit plus our HiPi board, a second Raspberry Pi, ESP32-S3 (not used). No LED socket kit.
+- **Caregiver Pi** (`edge/caregiver/`, `device_id=caregiver_1`): Grove button (debounced), buzzer, Grove LCD. Loop: every 1 s `GET /api/device/state?device_id=caregiver_1`; `alert` → buzzer pattern, backlight red, LCD shows `display`; `acked` → backlight green, LCD shows `message` for 5 s; `idle` → backlight dim, LCD shows "Ready". Every 5 s `POST /api/device/heartbeat`. Button press → `POST /api/device/ack` (ignore a 409).
+- **Bedside Pi** (`edge/bedside/`, `device_id=bedside_1`): every 1 s `GET /api/device/state?device_id=bedside_1`; when `last_ack.request_id` is new, play "Help is coming." (fetch once from `POST /api/tts` and cache the MP3 on the Pi). Every 5 s heartbeat. Stretch: capture camera frames, run hand landmarks, post the same Request with `source:"edge"` (features must match `web/src/cv/features.ts`). Gate for the camera part: QNX boots with the camera working.
+- Both must keep working if Wi-Fi drops: show "OFFLINE" (caregiver LCD) and retry in a loop. Use a phone hotspot if venue Wi-Fi is bad.
 
 ## 16. Definition of done per role
 
@@ -210,7 +214,7 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 - Rey: `/patient`, `/caregiver`, `/beacon`, polished, consuming the real API, plus the CREAO adaptation agent and its Apply card (section 19); the phone call only if time allows.
 - Josh: `useGestureTrigger()` hook, training flow, kNN, benchmark and `results.json`, `session.ts` and `adapt.ts` (section 19), plus the stretch model comparison in section 18.
 - Rey (also): leads the simulated-impairment data collection in section 18 at 9 PM, with Josh.
-- Alex: firmware on the real ESP32 hitting the live server, physical build, optional Pi/QNX node, demo hardware set.
+- Alex: caregiver Pi and bedside Pi hitting the live server, physical build, optional camera/QNX node on the bedside Pi, demo hardware set.
 
 ## 17. Track evidence checklist (README sections, owner in brackets)
 
@@ -218,7 +222,6 @@ CREAO keys (`capi_...`) never go in the browser or firmware.
 - CREAO: agent ID, a share link to a run and the Apply card screenshot in the README [Rey].
 - Photon: screenshot of the iMessage thread [Anay].
 - QNX: photo of the board running our node plus the AI module used [Alex].
-- Espressif: photo of the ESP32 unit working [Alex].
 - ElevenLabs: voice output used for the bedside and the call [Anay].
 - Paper: link to the design file [Rey]. Devin: note on what Devin built, with a screenshot [whoever uses it].
 
