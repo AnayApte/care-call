@@ -16,6 +16,7 @@ Works:
 - CREAO agent created and connected locally with a private, agent-scoped key.
 - Real API run on four synthetic sessions reached the caregiver screen; explicit Apply saved Pain-only retraining.
 - Added a small summary popup and a readable full-report route on josh/report-popup.
+- Patient screen has a visible Caregiver reports link during setup and regular use.
 - Reports survive refresh and Apply/Dismiss. Direct links without approval context are read-only.
 - Kept Rey's two-hand tracking and camera picker from PR #22 alongside Step 5.
 - 64 JavaScript tests, 16 server checks, TypeScript and the web build pass.

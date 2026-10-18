@@ -27,3 +27,5 @@
 2026-10-17 | Created the CREAO agent and, with Josh's approval, saved its key privately. A real API run returned the full proposal in chatText, so the reader now validates that field too. The same completed run reached the caregiver screen; Apply saved Pain-only retraining in the separate demo database. 16 server checks pass. Deployed-server key setup remains.
 
 2026-10-17 | Added a plain-English summary popup and a separate full-report page. Reports remain readable after refresh and approval; opening a link without its original settings is read-only. Popup, navigation, Dismiss and Apply passed browser checks without new CREAO runs. Kept Rey's PR #22 camera and hand changes while syncing Step 5. 64 JavaScript checks and web build pass.
+
+2026-10-17 | Added Caregiver reports to the patient screen so the summary and full report are easy to find.
