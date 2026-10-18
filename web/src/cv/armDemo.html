@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Care Call arm movement demo</title>
+  <title>Beacon arm movement demo</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #f3f6f8; color: #172d3d; font: 18px/1.5 system-ui; }
@@ -43,7 +43,7 @@
     </section>
     <section>
       <h2>2. Connect the alert device</h2>
-      <label for="alert-server">Care Call server URL</label>
+      <label for="alert-server">Beacon server URL</label>
       <input id="alert-server" type="url" value="http://127.0.0.1:8000" spellcheck="false">
       <p><label><input id="enable-device" type="checkbox"> Send HELP to this server when movement is flagged</label></p>
       <p class="small">Uses synthetic demo patient Maria. The caregiver Pi must use the same server and have Alex's device code running. A simulated drop can also send an alert when enabled.</p>

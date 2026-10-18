@@ -1,4 +1,4 @@
-# Care Call web
+# Beacon web
 
 Vite 5, React, TypeScript, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui.
 
@@ -10,6 +10,8 @@ npm run build
 
 Pages: `/patient` (training, then live recognition), `/caregiver`, `/beacon`.
 `VITE_API_BASE` points at the server (defaults to `http://localhost:8000`).
+
+Browser sound controls and playback are disabled; the external speaker handles audio.
 
 Design tokens live in `src/styles/tokens.css`. Mockups that the pages are built from: `mockups/index.html`.
 

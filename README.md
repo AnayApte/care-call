@@ -1,6 +1,6 @@
-# Beckon (codename Care Call)
+# Beacon
 
-After a stroke, many people can't speak or press a call button. **Beckon learns the movement a person can still make, says their request out loud, and alerts a caregiver, who answers with one button.**
+After a stroke, many people can't speak or press a call button. **Beacon learns the movement a person can still make, says their request out loud, and alerts a caregiver, who answers with one button.**
 
 > Assistive prototype, **not a medical device**. Synthetic patient ("Maria") only. Tested with teammates simulating limited dexterity, never with patients.
 
@@ -9,7 +9,7 @@ After a stroke, many people can't speak or press a call button. **Beckon learns 
 1. **Teach it the person.** On the patient screen, the patient holds whatever movement they can manage for each word: *water*, *pain*, *help*, *bathroom*, plus a rest pose. That's 15 short holds per word, about a minute in total. This builds a personal classifier in the browser.
 2. **Make the movement, hold it about a second.** A ring fills and a request is sent.
 3. **The caregiver unit announces it.** A Raspberry Pi with a button, buzzer and light turns **red and beeps**. Its speaker says the request in a natural ElevenLabs voice: *"I would like some water, please."*
-4. **One button to answer.** The light turns **green**, and the speaker and patient screen say **"Help is coming."** The patient screen goes back to listening on its own.
+4. **One button to answer.** The light turns **green**, and the speaker says **"Help is coming."** and the patient screen shows the confirmation The patient screen goes back to listening on its own.
 5. **No answer?** At **20 s** the caregiver gets an **iMessage (Photon)** with a native poll ("On my way" / "Can't come"). Tapping it, or replying `1`, answers the request. `status` lists open requests. Any other question ("what did she ask for today?") is answered by **Gemini** from the last 24 hours of requests, with no medical advice. The first answer from any channel cancels the rest, and each step happens once.
 6. **It adapts.** Between sessions, a **CREAO** agent reviews how each word performed (abandoned, confused, slow). It proposes settings in plain words, e.g. *"pain was confused with help 4 times; try a longer hold and re-record pain"*. The caregiver taps **Apply** or **Dismiss**. Values are clamped to safe ranges, and nothing changes without a human.
 
@@ -37,10 +37,10 @@ Devices never talk to each other directly. The venue Wi-Fi blocks device-to-devi
 
 ## Sponsor tracks: what we used and where
 
-| Track | What it does in Beckon | Where |
+| Track | What it does in Beacon | Where |
 | --- | --- | --- |
 | **Photon** | iMessage escalation at 20 s with a native poll; tap or reply to acknowledge; `status`; "already answered" updates. Photon ships only a TypeScript SDK, so a Node bridge runs next to the Python server in the same container. | `server/photon-bridge/`, `server/integrations/photon.py`, `server/routes/photon.py` |
-| **ElevenLabs** | The voice of someone who can't speak: each request phrase plus "Help is coming", pre-generated and cached on the server, played by the caregiver speaker and the patient screen | `server/tts.py`, `POST /api/tts` |
+| **ElevenLabs** | The voice of someone who can't speak: each request phrase plus "Help is coming", pre-generated and cached on the server, played by the external speaker; browser audio is off | `server/tts.py`, `POST /api/tts` |
 | **Gemini** | Answers the caregiver's free-text iMessage questions from the day's request log; 3-model fallback; never gives medical advice | `server/integrations/gemini.py` |
 | **CREAO** | Adaptation agent reviews session summaries and proposes clamped settings; caregiver approves with Apply. [Agent](https://agent.creao.ai/apps/ed1ff383-9e8c-4472-82e9-c62ffe28da1f), [verified run](https://agent.creao.ai/chat?threadId=e793d024-c2ad-464d-8a99-010813a1f883) | `server/integrations/creao.py`, `server/routes/adapt.py`, `/caregiver` report and Apply |
 | **Sentry** | Tracing with custom spans (`request.create`, `request.ack` tagged `latency_ms`), Logs, Profiling, AI monitoring (Gemini token counts, CREAO spans), release tracking | `server/sentry_setup.py`, `docs/sentry-evidence/` |

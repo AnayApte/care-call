@@ -65,7 +65,7 @@ export async function startRealHandTracker(
         piImage!.addEventListener("error", () => reject(new Error("Pi USB camera stream unavailable")), { once: true });
       });
     } else {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { ...(deviceId ? { deviceId } : { facingMode: "user" }), width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { ...(deviceId && deviceId !== "local-webcam" ? { deviceId } : { facingMode: "user" }), width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
       if (stopped) { stream.getTracks().forEach((t) => t.stop()); return stop; }
       video.srcObject = stream;
       await video.play().catch(() => undefined);

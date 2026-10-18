@@ -28,13 +28,18 @@
   gap: 16px;
 }
 .patient-design .patient-tools {
-  position: static; grid-column: 1; grid-row: 1; max-width: none;
+  position: static; grid-column: 1 / -1; grid-row: 2; max-width: none;
   align-items: flex-start; gap: 8px; font-size: 11px;
 }
-.patient-design .patient-tools > span {
-  flex-basis: 100%; color: #ededeb; line-height: 1.5;
-  text-shadow: 0 1px 6px #000;
-}
+.patient-design .patient-brand { grid-column: 1; grid-row: 1; justify-self: start; padding: 0; background: transparent; border: 0; color: #f0f0ed; text-shadow: 0 1px 8px #000; }
+.patient-design .patient-brand .beacon-mark { filter: drop-shadow(0 1px 3px #0009); }
+.patient-design .training-save-status { display: flex; align-items: center; gap: 16px; justify-self: start; padding: 0 8px; background: #101010; color: #f0f0ed; }
+.patient-design .training-save-status p { margin: 0; font-size: 12px; line-height: 1.5; }
+.patient-design .training-save-status p[role="alert"] { color: #ffd0b9; }
+.patient-design .training-save-details { position: relative; }
+.patient-design .training-save-details summary { cursor: pointer; padding-block: 2px; }
+.patient-design .training-save-details > p { position: absolute; z-index: 14; top: 100%; left: 0; width: min(420px, calc(100vw - 64px)); padding: 16px; border: 1px solid #777; background: #101010; }
+.patient-design:has(.training-save-status) .live-actions { grid-row: 3; }
 .patient-design .cam-select {
   position: static; grid-column: 2; grid-row: 1; transform: none;
   height: 44px; border-radius: 0; padding-left: 12px;
@@ -109,6 +114,8 @@
   .patient-toolbar { grid-template-columns: 1fr auto; gap: 10px 16px; }
   .patient-design .cam-select { grid-column: 1; grid-row: 2; justify-self: start; }
   .patient-design .live-actions { grid-column: 2; }
+  .patient-design:has(.training-save-status) .live-actions { grid-row: 2; }
+  .patient-design .patient-tools { grid-row: 3; }
   .patient-design .patient-caregiver-link { grid-column: 2; }
   .patient-design { --card-top: 220px; --card-h: min(320px, 40vh); }
   .patient-design .rail { top: 220px; }
@@ -119,7 +126,9 @@
   .patient-design { --frame-inset: 12px; --card-w: calc(100vw - 64px); --card-top: 258px; --card-h: min(290px, 37vh); --ring-size: 100px; }
   .patient-toolbar { left: 28px; right: 28px; top: 28px; gap: 10px; }
   .patient-design .patient-tools { font-size: 10px; }
+  .patient-design .patient-tools { grid-column: 1 / -1; grid-row: 4; }
   .patient-design .live-actions { grid-column: 1 / -1; grid-row: 3; max-width: none; }
+  .patient-design:has(.training-save-status) .live-actions { grid-row: 3; }
   .patient-design .btn-retrain { padding: 10px 12px; font-size: 12px; }
   .patient-design .cam-select { grid-column: 1 / -1; }
   .patient-design .cam-select select { max-width: 200px; }

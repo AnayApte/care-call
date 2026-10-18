@@ -36,6 +36,9 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 
 2026-10-18 | josh | Josh also requested matching patient fonts and buttons, with Caregiver screen at the top. Added patient styling and grouped its controls; camera and gesture logic are unchanged.
 
+2026-10-18 | josh | Josh renamed the app Beacon and requested a lighthouse logo and no website audio. Authorized web branding and audio changes. The browser keeps visual request/acknowledgement; external speaker code and stored data keys stay unchanged. Josh also requested investigation of the training-save error.
 2026-10-18 | alex | Alex requested running the transferred CV model on the QNX Pi. Use the target's native python3-numpy, python3-opencv and python3-mediapipe-cpu packages, with their dependencies, in a system-site-packages venv; add QNX camera/inference glue only under edge/bedside. This extends the software-only v2 phase for the explicitly requested hardware work; preserve the baseline weights and web CV code.
 2026-10-18 | alex | Native camera adapter build also needs qnx-sf-base-dev and qnx-screen-dev headers for the target's existing libcamapi; no additional runtime framework or model training is introduced.
 2026-10-18 | alex | Add a local `/camera.mjpg` endpoint to the Pi-hosted frontend server, capturing only QNX USB camera unit 5, and let the patient app use that stream as an input source | The tunneled page runs in a Mac browser, whose getUserMedia can only access Mac cameras; v2 currently excludes video streaming, and web camera integration is owned by Rey.
+
+2026-10-18 | josh | Josh's local webcam training check needs a laptop input. Keep Alex's Pi camera in production; offer a laptop webcam only in Vite development, with a separate camera preference. No hardware code changes.

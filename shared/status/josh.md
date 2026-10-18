@@ -89,3 +89,24 @@ Matched patient buttons, type, training cards and feedback. Caregiver screen is 
 at the top right. Live camera still shows; narrow training and form styles checked
 with a temporary preview that sends no requests or recordings.
 Typecheck, changed-file lint and production build pass.
+
+Beacon branding (2026-10-18): added a lighthouse mark from Josh's reference to the
+patient, caregiver, report and fallback headers, plus the browser icon and title.
+Removed website sound controls, training beeps and browser speech. External speaker
+code is unchanged. 65 CV checks, typecheck, changed-file lint and build pass.
+The silent request/acknowledgement cycle has an automated check. Live caregiver
+branding checked. Training-save investigation is next; no recordings were reset.
+
+Training-save check (2026-10-18): local API 8007 has 75 saved recordings, 15 per
+movement. The save endpoint and browser permissions respond correctly. No current
+failure appeared on the real page at 5181; the original failure cause is unconfirmed.
+Fixed the misleading Retry button during an upload. The page now distinguishes
+Saving, Saved and a failed save, with a retained reason and retry button.
+An isolated browser test rejected synthetic uploads, kept them and saved them after
+Retry. It used ports 5182/8011, not the webcam or real database. Test services closed.
+67 CV checks, typecheck, changed-file lint and build pass. Removed the logo box
+only on the patient page; caregiver branding keeps its original treatment.
+
+Synced Alex's Pi camera PR #34. Production still uses the Pi USB stream. The local
+Vite demo defaults to the laptop webcam and offers Pi input separately, so a local
+training check does not require the Pi's /camera.mjpg server.
