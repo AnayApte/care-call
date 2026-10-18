@@ -10,10 +10,11 @@ export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "
 
 const SAMPLES_PER_LABEL = 15;
 const HOLD_MS = 3000;
-const COUNTDOWN_FROM = 3;
+const COUNTDOWN_MS = 1700; // from hand detected to recording start
 const HOLD_CAP_MS = 10000;
 const DONE_SHOW_MS = 1100;
-const SENT_SHOW_MS = 3000;
+const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
+const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
 
 export type OnboardingState = {
@@ -26,7 +27,9 @@ export type OnboardingState = {
   lifting: Label | null;
   handPresent: boolean;
   trigger: TriggerState;
-  lastSent: Label | null;
+  /** Recognised word, shown until the caregiver dismisses it with a tap or the spacebar. */
+  result: Label | null;
+  /** Leave-one-out accuracy of the personal model, once all five labels are trained. */
   accuracy: number | null;
   toast: { text: string; kind: "info" | "error" } | null;
 };
@@ -42,10 +45,10 @@ function completeLabels(samples: Sample[]): Set<Label> {
 export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, countdown: 0, progress: 0, hint: "", lifting: null,
-    handPresent: false, trigger: idleTrigger, lastSent: null, accuracy: null, toast: null,
+    handPresent: false, trigger: idleTrigger, result: null, accuracy: null, toast: null,
   });
 
-  // Mutable session state read by the camera loop.
+  // Mutable session state read by the 30 fps frame loop. Kept out of React state to avoid stale closures.
   const session = useRef({
     phase: "loading" as Phase,
     index: 0,
@@ -59,6 +62,9 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     timers: [] as number[],
     listenGraceUntil: 0,
     handPresent: false,
+    result: null as Label | null,
+    handSeenSince: null as number | null,
+    countdownStartedAt: 0,
   });
 
   const patch = useCallback((p: Partial<OnboardingState>) => setState((s) => ({ ...s, ...p })), []);
@@ -72,7 +78,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   }, []);
   const toast = useCallback((text: string, kind: "info" | "error" = "info") => {
     patch({ toast: { text, kind } });
-    later(() => patch({ toast: null }), SENT_SHOW_MS);
+    later(() => patch({ toast: null }), TOAST_MS);
   }, [patch, later]);
 
   const beginHold = useCallback(() => {
@@ -85,13 +91,11 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
 
   const startCountdown = useCallback(() => {
     sounds.unlock();
-    setPhase("countdown", { countdown: COUNTDOWN_FROM, hint: "Get ready." });
+    session.current.countdownStartedAt = performance.now();
+    setPhase("countdown", { countdown: Math.ceil(COUNTDOWN_MS / 1000), progress: 0, hint: "Get ready." });
     sounds.tick();
-    for (let n = COUNTDOWN_FROM - 1; n >= 1; n -= 1) {
-      later(() => { patch({ countdown: n }); sounds.tick(); }, (COUNTDOWN_FROM - n) * 1000);
-    }
-    later(beginHold, COUNTDOWN_FROM * 1000);
-  }, [setPhase, patch, later, beginHold]);
+    later(() => { sounds.tick(); beginHold(); }, COUNTDOWN_MS);
+  }, [setPhase, later, beginHold]);
 
   const finishLabel = useCallback((samples: Sample[]) => {
     const s = session.current;
@@ -112,6 +116,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         return;
       }
       s.index += 1;
+      s.handSeenSince = null;
       setPhase("waiting", { index: s.index, lifting: label, progress: 0, hint: "Any movement they can repeat works." });
     }, DONE_SHOW_MS);
   }, [setPhase, later, toast]);
@@ -122,6 +127,18 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     const tone: HandTone = s.phase === "holding" || s.phase === "listening" ? "live" : "faint";
     if (canvasRef.current && videoRef.current) drawHand(canvasRef.current, videoRef.current, frame.landmarks, tone);
     if (present !== s.handPresent) { s.handPresent = present; patch({ handPresent: present }); }
+    if (s.phase === "countdown") {
+      // Smooth ring during the countdown: progress follows elapsed time, the digit follows whole seconds.
+      const elapsed = performance.now() - s.countdownStartedAt;
+      patch({ progress: Math.min(1, elapsed / COUNTDOWN_MS), countdown: Math.max(1, Math.ceil((COUNTDOWN_MS - elapsed) / 1000)) });
+      return;
+    }
+    if (s.phase === "waiting") {
+      if (!present) { s.handSeenSince = null; return; }
+      s.handSeenSince ??= frame.timestamp;
+      if (frame.timestamp - s.handSeenSince >= AUTO_START_AFTER_MS) { s.handSeenSince = null; startCountdown(); }
+      return;
+    }
     if (s.phase === "holding") {
       const steady = s.gate.update(frame.landmarks);
       if (performance.now() - s.holdStartedAt > HOLD_CAP_MS) {
@@ -145,22 +162,24 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       return;
     }
     if (s.phase === "listening") {
-      if (performance.now() < s.listenGraceUntil) { s.trigger.reset(); return; }
+      if (s.result || performance.now() < s.listenGraceUntil) { s.trigger.reset(); return; }
       const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
       const next = s.trigger.update(prediction, frame.timestamp);
       if (import.meta.env.DEV) (window as unknown as { __ccDebug?: unknown }).__ccDebug = { prediction, next, ready: s.classifier.isReady(), samples: s.samples.length };
       patch({ trigger: next });
       if (next.fired) {
         const fired = next.fired;
+        s.result = fired.label;
+        sounds.check();
+        patch({ result: fired.label });
         void api.createRequest(fired.label, fired.confidence).then((r) => {
-          if (!r.ok) { toast(`Could not send: ${r.error}`, "error"); return; }
-          patch({ lastSent: fired.label });
-          later(() => patch({ lastSent: null }), SENT_SHOW_MS);
+          if (!r.ok) toast(`Could not send: ${r.error}`, "error");
         });
       }
       return;
     }
-  }, [patch, toast, startCountdown, finishLabel, later, canvasRef, videoRef]);
+  }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef]);
+
 
   // Load patient and samples, then pick the starting point.
   useEffect(() => {
@@ -210,6 +229,15 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
 
   useEffect(() => () => { session.current.timers.forEach((id) => window.clearTimeout(id)); }, []);
 
+  /** Clears the shown result and goes back to watching. Bound to a tap on the screen and the spacebar. */
+  const dismiss = useCallback(() => {
+    const s = session.current;
+    if (!s.result) return;
+    s.result = null;
+    s.trigger.reset();
+    patch({ result: null, trigger: idleTrigger });
+  }, [patch]);
+
   const retrain = useCallback(async () => {
     const s = session.current;
     s.timers.forEach((id) => window.clearTimeout(id));
@@ -217,10 +245,12 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.classifier.setSamples([]);
     s.index = 0;
     s.trigger.reset();
-    setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, lastSent: null, accuracy: null, hint: "Any movement they can repeat works." });
+    s.result = null;
+    s.handSeenSince = null;
+    setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, result: null, accuracy: null, hint: "Any movement they can repeat works." });
     const r = await api.deleteSamples();
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
   }, [setPhase, toast]);
 
-  return { state, start: startCountdown, retrain };
+  return { state, start: startCountdown, retrain, dismiss };
 }

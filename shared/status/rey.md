@@ -1,6 +1,6 @@
 # Status: rey
 
-Updated: 2026-10-17 ~6:45 PM
+Updated: 2026-10-17 ~7:50 PM
 
 Works:
 - `web/` scaffolded: Vite 5, React, TS, Tailwind v4 (`@tailwindcss/vite`), shadcn. `npm run dev` then http://localhost:5173/patient. Tokens in `web/src/styles/tokens.css`.
@@ -14,3 +14,5 @@ Blocked / need:
 
 Next:
 - `/beacon` (by 6:30 PM), then `/caregiver`.
+
+Note for Josh (after #12): `/patient` uses your classifier and sample capture, but keeps its own tracker (every camera frame, smoothed landmarks; your camera.ts is capped at 12 detections/s which looks steppy on the live skeleton) and its own time-based trigger (2 s fill, 400 ms grace, drain, 0.7). Your `patientSimulation` hands collapse through the baseline embedding (leave-one-out 20%), so `?mock=1` cannot demo recognition; real hands only.

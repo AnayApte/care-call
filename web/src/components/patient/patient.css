@@ -37,14 +37,24 @@
 .status small { display: block; color: rgba(255, 255, 255, 0.72); font-size: var(--text-hint); font-weight: 400; margin-top: 4px; }
 
 .ring { position: relative; width: var(--ring-size); height: var(--ring-size); flex: none; box-shadow: none; }
-.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring > svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring .track { fill: none; stroke: var(--ring-track); stroke-width: 14; }
-.ring .fill { fill: none; stroke: var(--pine); stroke-width: 14; stroke-dasharray: 471; transition: stroke-dashoffset 90ms linear, stroke var(--duration-fast); }
+.ring .fill { fill: none; stroke: var(--pine); stroke-width: 14; stroke-dasharray: 471; stroke-linecap: round; transition: stroke var(--duration-fast); }
 .ring.countdown .fill { stroke: var(--signal); }
 .ring .label { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 56px; }
+.ring.large .check { width: 96px; height: 96px; }
 .ring .label.small { font-size: 22px; font-weight: 500; }
-.ring.done { border-radius: 50%; background: var(--pine); }
-.ring.done svg { visibility: hidden; }
+.ring.done { border-radius: 50%; background: var(--pine); animation: disc-pop 360ms var(--ease-out) both; }
+.ring.done > svg:not(.check) { visibility: hidden; }
+.ring .check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: check-draw 420ms 140ms var(--ease-out) forwards; }
+@keyframes disc-pop {
+  from { transform: scale(0.86); }
+  60% { transform: scale(1.04); }
+  to { transform: scale(1); }
+}
+@keyframes check-draw {
+  to { stroke-dashoffset: 0; }
+}
 .ring.large { width: min(220px, 28vh); height: min(220px, 28vh); }
 .ring.large .label.small { font-size: 26px; }
 
@@ -64,6 +74,7 @@
 
 .live-word { color: #fff; font-size: min(var(--text-word-live), 18vh); font-weight: 700; letter-spacing: -0.02em; position: absolute; left: 72px; bottom: 160px; margin: 0; line-height: 1;
   text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
+.live-word.result { color: var(--pine-soft); }
 .live-sub { position: absolute; left: 74px; bottom: 110px; color: rgba(255, 255, 255, 0.78); font-size: 22px; margin: 0; }
 .live-ring { position: absolute; right: 88px; bottom: 88px; }
 .notice { position: absolute; left: 72px; bottom: 46px; color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 0; }

@@ -1,23 +1,38 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { Deck } from "@/components/patient/Deck";
 import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
 import { TRAINING_ORDER, DISPLAY_WORD } from "@/lib/labels";
+import { sounds } from "@/lib/sounds";
 import { USE_MOCK_HAND } from "@/lib/cv";
 import "@/components/patient/patient.css";
 
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { state, start, retrain } = useOnboarding(videoRef, canvasRef);
-  const { phase, index, countdown, progress, hint, lifting, trigger, lastSent, toast } = state;
+  const { state, retrain, dismiss } = useOnboarding(videoRef, canvasRef);
+  const { phase, index, progress, hint, lifting, trigger, result, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
-  const liveWord = lastSent ?? trigger.label;
+  const deciding = !result && trigger.progress > 0;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.code === "Space" && result) { e.preventDefault(); dismiss(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [result, dismiss]);
+
+  // Browsers only allow sound after a user gesture. Any tap or key on the page unlocks the cues.
+  useEffect(() => {
+    const unlock = () => sounds.unlock();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
+  }, []);
 
   return (
-    <main className="relative h-full overflow-hidden">
+    <main className="relative h-full overflow-hidden" onClick={result ? dismiss : undefined}>
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
         <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
         <HandCanvas ref={canvasRef} />
@@ -30,14 +45,14 @@ export default function PatientPage() {
           <div className="dock">
             {phase === "waiting" && (
               <>
-                <button type="button" className="btn-start" onClick={start} autoFocus>Start</button>
-                <p className="status">{state.handPresent ? "Ready" : "Waiting for a hand"}<small>{state.handPresent ? "Tap Start when they are ready." : "Bring the hand into the picture."}</small></p>
+                <Ring progress={0} mode="hold" small>{state.handPresent ? "Found" : ""}</Ring>
+                <p className="status">{state.handPresent ? "Hand found" : "Waiting for a hand"}<small>{state.handPresent ? "Starting in a moment. Keep it in the picture." : "Bring the hand into the picture to begin."}</small></p>
               </>
             )}
             {phase === "countdown" && (
               <>
-                <Ring progress={1 - countdown / 3} mode="countdown">{countdown}</Ring>
-                <p className="status">Get ready<small>Recording starts in a moment.</small></p>
+                <Ring progress={progress} mode="countdown" small>Get ready</Ring>
+                <p className="status">Hand found<small>Recording starts in a moment. Make the movement now.</small></p>
               </>
             )}
             {phase === "holding" && (
@@ -58,12 +73,12 @@ export default function PatientPage() {
 
       {phase === "listening" && (
         <>
-          <button type="button" className="btn-retrain" onClick={retrain}>Retrain movements</button>
-          <h2 className="live-word">{liveWord ? DISPLAY_WORD[liveWord] : "Ready"}</h2>
-          <p className="live-sub">{lastSent ? "Request sent. Waiting for a caregiver." : liveWord ? "Keep holding to send the request." : "Watching for a movement. Make one and hold it."}</p>
+          <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); void retrain(); }}>Retrain movements</button>
+          <h2 className={`live-word ${result ? "result" : ""}`}>{result ? DISPLAY_WORD[result] : deciding ? "Hold it" : "Ready"}</h2>
+          <p className="live-sub">{result ? "Request sent. Waiting for a caregiver. Tap the screen or press space to continue." : deciding ? "Keep holding while the ring fills." : "Watching for a movement."}</p>
           <div className="live-ring">
-            <Ring progress={lastSent ? 1 : trigger.progress} mode={lastSent ? "done" : "hold"} large small>
-              {lastSent ? <CheckMark /> : trigger.cooldownMs > 0 ? "Wait" : trigger.label ? "Hold" : ""}
+            <Ring progress={result ? 1 : trigger.progress} mode={result ? "done" : "hold"} large small>
+              {result ? <CheckMark /> : ""}
             </Ring>
           </div>
           <p className="notice">{state.accuracy !== null && <>Training check: {Math.round(state.accuracy * 100)}% (leave-one-out).<br /></>}Assistive prototype, not a medical device.</p>
@@ -71,7 +86,7 @@ export default function PatientPage() {
       )}
 
       {phase === "loading" && <div className="toast">Starting camera</div>}
-      {USE_MOCK_HAND && <p style={{ position: "fixed", top: 12, left: 12, zIndex: 50, background: "white", padding: 8, color: "black" }}>Simulation: 0 rest · 1 water · 2 pain · 3 help · 4 bathroom · X hide</p>}
+      {USE_MOCK_HAND && <p className="toast" style={{ top: "auto", bottom: 56 }}>Simulation: 0 rest, 1 water, 2 pain, 3 help, 4 bathroom, X hide</p>}
       {toast && <div className={`toast ${toast.kind === "error" ? "error" : ""}`} role="status">{toast.text}</div>}
     </main>
   );

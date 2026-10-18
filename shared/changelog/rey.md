@@ -10,3 +10,4 @@
 - 2026-10-17 17:45 | web: scaffold (Vite 5, React, TS, Tailwind v4, shadcn, tokens), /patient onboarding flow from mockup A1, mock gesture layer behind an adapter, tested against the local server.
 - 2026-10-17 18:45 | web: real MediaPipe hand tracking behind the adapter (mock via ?mock=1), camera double-mount fix, layout scales to short windows.
 - 2026-10-17 19:05 | web: stand-in classifier is now a kNN vote, trigger fills and drains over time at 0.7 confidence; contract request logged for the threshold.
+- 2026-10-17 19:50 | web: rebased the patient UI onto Josh's cv merge. Camera stays on the full-rate smoothed tracker in `web/src/lib/handTracker.ts` (his features), classifier and capture are his, trigger is `web/src/lib/holdTrigger.ts` (2 s fill with grace and drain, 0.7). 1.7 s auto countdown, result stays until tap or space, eased ring, animated check.
