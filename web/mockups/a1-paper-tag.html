@@ -16,17 +16,23 @@
   .deck { position: absolute; left: 72px; top: 96px; width: 560px; }
   .deck { height: 372px; }
   .deck .tag { position: absolute; left: 0; top: 0; height: 372px; transform: none; }
-  .deck .tag.behind { z-index: 0; transform: translateY(-14px) scale(.97); background: var(--paper-2); box-shadow: 0 10px 24px -16px rgba(0,0,0,.5); }
-  .deck .tag.behind.b2 { transform: translateY(-28px) scale(.94); background: #ded7c8; }
-  .deck .tag.behind.b3 { transform: translateY(-42px) scale(.91); background: #d2cbbb; }
+  /* Paper: slightly warm, a grain overlay, a soft fibrous edge, every card at its own angle. */
+  .tag { background: #f4efe4; transform: rotate(-1.4deg); }
+  .tag::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.5 0 0 0 0 0.42 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .deck .tag { transform: rotate(-1.4deg); }
+  .deck .tag.behind { z-index: 0; box-shadow: 0 10px 24px -16px rgba(0,0,0,.55), 0 1px 0 rgba(0,0,0,.08); }
+  .deck .tag.behind.b1 { transform: translate(10px, -12px) rotate(1.6deg); background: #ece6d8; }
+  .deck .tag.behind.b2 { transform: translate(-8px, -24px) rotate(-2.8deg); background: #e4ddcd; }
+  .deck .tag.behind.b3 { transform: translate(14px, -34px) rotate(3.4deg); background: #dcd4c2; }
   .deck .tag.top { z-index: 2; }
-  .deck .tag.lifting { z-index: 3; transform: translateY(-330px) rotate(-4deg); opacity: .5; box-shadow: 0 40px 50px -20px rgba(0,0,0,.6); }
+  .deck .tag.lifting { z-index: 3; transform: translateY(-330px) rotate(-7deg); opacity: .5; box-shadow: 0 40px 50px -20px rgba(0,0,0,.6); }
   .deck .tag.behind .step, .deck .tag.behind .word, .deck .tag.behind .ask, .deck .tag.behind .hint { visibility: hidden; }
   /* The one bold thing: a paper tag pinned to the feed, like a note left on the bedside. */
   .tag { position: absolute; left: 64px; top: 64px; width: 560px; padding: 40px 44px 36px; background: var(--paper); color: var(--ink);
     box-shadow: 0 24px 40px -20px rgba(0,0,0,.55), 0 2px 0 rgba(0,0,0,.08);
     clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 0 100%); }
-  .tag::before { content: ""; position: absolute; right: 0; top: 0; width: 28px; height: 28px; background: var(--paper-2); clip-path: polygon(0 0, 0 100%, 100% 100%); }
+  .tag::before { content: ""; position: absolute; right: 0; top: 0; width: 28px; height: 28px; z-index: 1; background: #e3dccb; clip-path: polygon(0 0, 0 100%, 100% 100%); }
   .tag .step { font-size: 18px; color: var(--mute); margin: 0 0 18px; font-weight: 500; }
   .tag .word { font-size: 124px; line-height: .92; margin: 0 0 22px; font-weight: 700; letter-spacing: -.02em; font-variation-settings: "opsz" 96; }
   .tag .ask { font-size: 24px; line-height: 1.3; margin: 0; max-width: 24ch; }
