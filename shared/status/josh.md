@@ -79,3 +79,13 @@ and build pass.
 Caregiver text (2026-10-18): replaced the slogan with "Caregiver dashboard" and
 hard-coded Maria labels with "patient" or "demo profile", including report views.
 Verified the dashboard and popup in the browser. Typecheck, changed-file lint and build pass.
+
+Dashboard design (2026-10-18): black grid, white type and a geometric header inspired
+by the [Hello from Here archive](https://www.awwwards.com/sites/hello-from-here).
+Waiting requests get a compact header and prominent acknowledgement button.
+Answered requests expand in history. The popup and detailed report share the style.
+Checked browser layouts at 390px, 768px and desktop, history and report navigation.
+Matched patient buttons, type, training cards and feedback. Caregiver screen is now
+at the top right. Live camera still shows; narrow training and form styles checked
+with a temporary preview that sends no requests or recordings.
+Typecheck, changed-file lint and production build pass.

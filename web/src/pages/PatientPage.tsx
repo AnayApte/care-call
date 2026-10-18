@@ -11,6 +11,7 @@ import { AddWordDialog } from "@/components/patient/AddWordDialog";
 import { loadCameraId } from "@/lib/cameraPref";
 import { sounds } from "@/lib/sounds";
 import "@/components/patient/patient.css";
+import "@/components/patient/patient-theme.css";
 
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -50,16 +51,28 @@ export default function PatientPage() {
   }, []);
 
   return (
-    <main className="relative h-full overflow-hidden">
+    <main className="patient-design relative h-full overflow-hidden">
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
         <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
         <HandCanvas ref={canvasRef} />
       </div>
-      {!USE_MOCK_HAND && <CameraSelect value={cameraId} onChange={setCameraId} />}
-      <div className="patient-tools">
-        <button type="button" onClick={() => { void enableSound(); }}>{state.voice === "off" || state.voice === "blocked" ? "Enable sound" : "Enable sound again"}</button>
-        <span role="status">{state.voice === "off" ? "Sound is off" : state.voice === "browser" ? "Browser voice fallback" : state.voice === "blocked" ? "Sound blocked — tap Enable sound" : state.voice === "elevenlabs" ? "ElevenLabs audio" : "Sound ready"}</span>
-        {state.savingTraining && <button type="button" onClick={() => { void saveTraining(); }}>Retry training save</button>}
+      <div className="patient-toolbar">
+        {!USE_MOCK_HAND && <CameraSelect value={cameraId} onChange={setCameraId} />}
+        <div className="patient-tools">
+          <button type="button" onClick={() => { void enableSound(); }}>{state.voice === "off" || state.voice === "blocked" ? "Enable sound" : "Enable sound again"}</button>
+          <span role="status">{state.voice === "off" ? "Sound is off" : state.voice === "browser" ? "Browser voice fallback" : state.voice === "blocked" ? "Sound blocked — tap Enable sound" : state.voice === "elevenlabs" ? "ElevenLabs audio" : "Sound ready"}</span>
+          {state.savingTraining && <button type="button" onClick={() => { void saveTraining(); }}>Retry training save</button>}
+        </div>
+        <a className="patient-caregiver-link" href="/caregiver" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>Caregiver screen <span aria-hidden="true">↗</span></a>
+        {canSkip && onboarding && phase !== "done" && (
+          <div className="live-actions"><button type="button" className="btn-retrain" onClick={skipWord}>Not now</button></div>
+        )}
+        {phase === "listening" && !result && !isAddingWord && (
+          <div className="live-actions">
+            <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); openAddWord(); }}>Add a word</button>
+            <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); void retrain(); }}>Retrain movements</button>
+          </div>
+        )}
       </div>
       {state.cameraError && <div className="patient-warning" role="alert">{state.cameraError} <button type="button" onClick={() => window.location.reload()}>Reload camera</button></div>}
       {flow.error && <div className="patient-warning delivery-warning" role="alert">{flow.error}
@@ -72,9 +85,6 @@ export default function PatientPage() {
         <>
           <StepRail total={order.length} index={index} />
           <Deck order={order} vocabulary={patient.vocabulary} index={index} lifting={lifting} hint={hint} done={phase === "done"} />
-          {canSkip && phase !== "done" && (
-            <div className="live-actions"><button type="button" className="btn-retrain" onClick={skipWord}>Not now</button></div>
-          )}
           <div className="dock">
             {phase === "waiting" && (
               <>
@@ -106,12 +116,6 @@ export default function PatientPage() {
 
       {phase === "listening" && (
         <>
-          {!result && !isAddingWord && (
-            <div className="live-actions">
-              <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); openAddWord(); }}>Add a word</button>
-              <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); void retrain(); }}>Retrain movements</button>
-            </div>
-          )}
           {isAddingWord && <AddWordDialog onAdd={submitWord} onCancel={closeAddWord} />}
           <h2 className={`live-word ${result ? "result" : ""}`}>{result ? displayWord(result, patient.vocabulary) : deciding ? "Hold it" : "Ready"}</h2>
           <p className="live-sub" role="status" aria-live="polite">{status}</p>
@@ -152,7 +156,6 @@ export default function PatientPage() {
       {phase === "loading" && <div className="toast">Starting camera</div>}
       {USE_MOCK_HAND && <p className="toast" style={{ top: "auto", bottom: 56 }}>Simulation: 0 rest, 1 water, 2 pain, 3 help, 4 bathroom, 5 added word, X hide</p>}
       {toast && <div className={`toast ${toast.kind === "error" ? "error" : ""}`} role="status">{toast.text}</div>}
-      <a className="patient-caregiver-link" href="/caregiver" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>Caregiver screen <span aria-hidden="true">↗</span></a>
     </main>
   );
 }

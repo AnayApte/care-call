@@ -8,6 +8,7 @@ import { LABELS } from "../cv/types";
 import ReportText from "../components/ReportText";
 import "./caregiver.css";
 import "../components/report.css";
+import "./dashboard.css";
 
 const percent = (value: number) => `${Math.round(value * 100)}%`;
 const hold = (frames: number) => `${frames} frames`;
@@ -70,8 +71,8 @@ export default function CaregiverReportPage({ reportId }: { reportId: string }) 
   const stale = pending && current && base!.version !== current.version;
   const summary = report ? reportSummary(report) : null;
 
-  return <main className="caregiver"><div className="report-page">
-    <header className="cg-header"><a className="cg-brand" href="/caregiver">Care Call <span> / report</span></a><a href="/caregiver"><ArrowLeft size={14} className="inline" /> Back to caregiver</a></header>
+  return <main className="caregiver dashboard dashboard-report"><div className="report-page">
+    <header className="cg-header"><a className="cg-brand" href="/caregiver"><span className="dash-brand-mark" aria-hidden="true">✳</span>CARE CALL<span className="dash-view"> / REPORT</span></a><a href="/caregiver"><ArrowLeft size={14} className="inline" /> Back to caregiver</a></header>
     <div className="report-page-heading"><p className="cg-eyebrow">DETAILED REPORT</p><h1>{summary?.title ?? "Your practice review"}</h1><p>CREAO’s explanation and suggested settings for this demo profile.</p></div>
     {error && <p className="cg-message cg-error" role="alert">{error} <button className="report-inline-link" onClick={() => { setError(""); setLoading(!report); setRetry(n => n + 1); }}>Try again</button></p>}
     {notice && <p className="cg-message" role="status">{notice}</p>}
