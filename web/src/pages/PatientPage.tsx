@@ -4,16 +4,16 @@ import { Deck } from "@/components/patient/Deck";
 import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
-import { TRAINING_ORDER, DISPLAY_WORD } from "@/lib/labels";
-import { sounds } from "@/lib/sounds";
+import { DISPLAY_WORD } from "@/lib/labels";
 import { USE_MOCK_HAND } from "@/lib/cv";
+import { sounds } from "@/lib/sounds";
 import "@/components/patient/patient.css";
 
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { state, retrain, dismiss } = useOnboarding(videoRef, canvasRef);
-  const { phase, index, progress, hint, lifting, trigger, result, toast } = state;
+  const { phase, index, order, progress, hint, lifting, trigger, result, delivery, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
 
@@ -40,8 +40,8 @@ export default function PatientPage() {
 
       {onboarding && (
         <>
-          <StepRail total={TRAINING_ORDER.length} index={index} />
-          <Deck order={TRAINING_ORDER} index={index} lifting={lifting} hint={hint} done={phase === "done"} />
+          <StepRail total={order.length} index={index} />
+          <Deck order={order} index={index} lifting={lifting} hint={hint} done={phase === "done"} />
           <div className="dock">
             {phase === "waiting" && (
               <>
@@ -75,10 +75,13 @@ export default function PatientPage() {
         <>
           <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); void retrain(); }}>Retrain movements</button>
           <h2 className={`live-word ${result ? "result" : ""}`}>{result ? DISPLAY_WORD[result] : deciding ? "Hold it" : "Ready"}</h2>
-          <p className="live-sub">{result ? "Request sent. Waiting for a caregiver. Tap the screen or press space to continue." : deciding ? "Keep holding while the ring fills." : "Watching for a movement."}</p>
+          <p className="live-sub">{result ? delivery === "sent"
+            ? "Request sent. Waiting for a caregiver. Tap the screen or press space to continue."
+            : delivery === "failed" ? "Request status unavailable. Tap the screen or press space to continue."
+            : "Sending request…" : deciding ? "Keep holding while the ring fills." : "Watching for a movement."}</p>
           <div className="live-ring">
-            <Ring progress={result ? 1 : trigger.progress} mode={result ? "done" : "hold"} large small>
-              {result ? <CheckMark /> : ""}
+            <Ring progress={result ? 1 : trigger.progress} mode={delivery === "sent" ? "done" : "hold"} large small>
+              {delivery === "sent" ? <CheckMark /> : delivery === "sending" ? "Sending" : delivery === "failed" ? "Check" : ""}
             </Ring>
           </div>
           <p className="notice">{state.accuracy !== null && <>Training check: {Math.round(state.accuracy * 100)}% (leave-one-out).<br /></>}Assistive prototype, not a medical device.</p>

@@ -20,9 +20,11 @@ export function createSession(patientId: string, configVersion = 1, startedAt = 
   const confusions: SessionSummary["confusions"] = [];
   let falseNeutral = 0;
   return {
-    recordAttempt(label: RequestLabel, confidence: number, holdFrames: number, fired: boolean) {
+    hasData: () => Object.keys(labels).length > 0 || confusions.length > 0,
+    recordAttempt(label: RequestLabel, confidence: number, holdFrames: number, fired: boolean, minConfidence = confidence) {
       if (!isLabel(label) || label === ("neutral" as Label) || !Number.isFinite(confidence) || confidence < 0 || confidence > 1 ||
-          !Number.isInteger(holdFrames) || holdFrames < 1) throw new Error("Invalid attempt");
+          !Number.isInteger(holdFrames) || holdFrames < 1 || !Number.isFinite(minConfidence) ||
+          minConfidence < 0 || minConfidence > confidence) throw new Error("Invalid attempt");
       const stats = labels[label] ?? { attempts: 0, fired: 0, abandoned: 0, mean_conf: 0, min_conf: 1, mean_hold_frames_to_fire: 0 };
       const total = totals.get(label) ?? { confidence: 0, frames: 0 };
       stats.attempts++;
@@ -31,7 +33,7 @@ export function createSession(patientId: string, configVersion = 1, startedAt = 
       total.confidence += confidence;
       total.frames += fired ? holdFrames : 0;
       stats.mean_conf = total.confidence / stats.attempts;
-      stats.min_conf = Math.min(stats.min_conf, confidence);
+      stats.min_conf = Math.min(stats.min_conf, minConfidence);
       stats.mean_hold_frames_to_fire = stats.fired ? total.frames / stats.fired : 0;
       labels[label] = stats;
       totals.set(label, total);
@@ -57,7 +59,7 @@ export function createSession(patientId: string, configVersion = 1, startedAt = 
 export async function postSession(apiBase: string, summary: SessionSummary): Promise<void> {
   const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/cv/sessions`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(summary), keepalive: true,
+    body: JSON.stringify(summary), keepalive: true, signal: AbortSignal.timeout(8000),
   });
   if (!response.ok) throw new Error(`Session upload failed (${response.status})`);
 }

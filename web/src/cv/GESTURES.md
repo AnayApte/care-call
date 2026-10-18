@@ -54,7 +54,7 @@ keep the package and WASM versions matched. See `camera.ts` for download URLs.
 
 ## Checks
 
-33 tests, two server checks, the TypeScript check and the web build passed. Browser calculations
+48 JavaScript tests, five server checks, the TypeScript check and the web build passed. Browser calculations
 match Rey's reference examples. Live webcam performance still needs testing.
 
 After installing the web dependencies, run these from the repo root:
