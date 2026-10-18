@@ -21,12 +21,12 @@ export function settingsFrom(value: unknown): Settings {
   return { ...sanitizeAdaptConfig(raw), suggest_replace };
 }
 
-export function reviewFrom(run: Run, base: Settings): Review {
+export function reviewFrom(run: Run, base?: Settings): Review {
   if (run.status !== "done" || typeof run.explanation_md !== "string" || !run.explanation_md.trim()) {
     throw new Error("CREAO did not return a usable suggestion. Your settings have not changed.");
   }
   const settings = settingsFrom(run.proposal);
-  return { settings: { ...settings, version: base.version + 1 }, explanation: run.explanation_md.slice(0, 12000) };
+  return { settings: { ...settings, version: base ? base.version + 1 : settings.version }, explanation: run.explanation_md.slice(0, 12000) };
 }
 
 export function createAdaptationClient(apiBase: string, patientId: string) {
@@ -53,7 +53,7 @@ export function createAdaptationClient(apiBase: string, patientId: string) {
       if (typeof result.job_id !== "string" || !result.job_id) throw new Error("Missing CREAO run");
       return { id: result.job_id, base: settingsFrom(result.base_config) };
     },
-    poll: (job: Job) => request<Run>(`/api/adapt/${encodeURIComponent(job.id)}`),
+    poll: (job: Pick<Job, "id">) => request<Run>(`/api/adapt/${encodeURIComponent(job.id)}`),
     // This is the only settings write. The page calls it after an explicit Apply tap.
     apply: async (job: Job, review: Review): Promise<Settings> => settingsFrom(await request(
       `${patient}/adapt-config?expected_version=${job.base.version}`, {
