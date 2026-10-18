@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pickCameraId } from "./cameraSource.ts";
 
-test("Pi-hosted build always uses the Pi camera", () => {
-  assert.equal(pickCameraId({ isDev: false, laptopWebcam: false, stored: "abc" }), "pi-usb");
+test("Pi-hosted build defaults to the Pi camera but keeps a stored webcam choice", () => {
+  assert.equal(pickCameraId({ isDev: false, laptopWebcam: false, stored: "local-webcam" }), "local-webcam");
   assert.equal(pickCameraId({ isDev: false, laptopWebcam: false, stored: null }), "pi-usb");
 });
 

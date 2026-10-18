@@ -9,6 +9,7 @@ import { USE_MOCK_HAND } from "@/lib/cv";
 import { CameraSelect } from "@/components/patient/CameraSelect";
 import { AddWordDialog } from "@/components/patient/AddWordDialog";
 import { loadCameraId } from "@/lib/cameraPref";
+import { LAPTOP_WEBCAM, PI_CAMERA } from "@/lib/cameraSource";
 import Brand from "@/components/Brand";
 import "@/components/patient/patient.css";
 import "@/components/patient/patient-theme.css";
@@ -65,8 +66,9 @@ export default function PatientPage() {
   return (
     <main className="patient-design relative h-full overflow-hidden" onClick={onScreenClick}>
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
-        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" hidden={cameraId === "pi-usb"} />
-        {cameraId === "pi-usb" && <img className="pi-cam-preview" src="/camera.mjpg" alt="Pi USB camera preview" />}
+        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" hidden={cameraId === PI_CAMERA} />
+        {/* No Pi stream here (e.g. Vercel or local preview): fall back to the laptop webcam for this visit. */}
+        {cameraId === PI_CAMERA && <img className="pi-cam-preview" src="/camera.mjpg" alt="Pi USB camera preview" onError={() => setCameraId(LAPTOP_WEBCAM)} />}
         <HandCanvas ref={canvasRef} />
       </div>
       <div className="patient-toolbar">
