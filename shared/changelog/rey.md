@@ -6,3 +6,4 @@
   augmentation (`augment.py`), `--holdout` transfer test (`fewshot.py`). Found and fixed a
   wrist-jitter bug that collapsed training. Notes in `ml/experiments.md`, design in
   `docs/ml-gestures.md`.
+- 2026-10-17 17:25 | web/mockups: three onboarding mockup variations (A1 paper tag, A2 bottom sheet, A3 typographic), decisions recorded in status. Static HTML only, no app code yet.

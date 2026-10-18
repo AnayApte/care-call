@@ -1,17 +1,13 @@
 # Status: rey
 
-Updated: 2026-10-17 16:15
+Updated: 2026-10-17 ~5:25 PM
 
 Works:
-- `ml/`: HaGRIDv2 landmark baseline v2. 1.05M train hands, 95.2% on 34 classes, user-disjoint.
-  Embedding beats raw landmarks for 15-shot personal kNN, including on 5 gestures held out of
-  training (98.5% vs 96.1%). `baseline.json` + `test_vectors.json` ready for a JS port.
-- `ml/camera_test.py` live two-hand webcam check.
+- Branch `rey/onboarding-ui`. Three static HTML mockups of the /patient onboarding (training) flow in `web/mockups/` (open `index.html`, or `<page>.html?frame=N` for one frame at 1280x800). Warm clinical direction, three variations: paper tag, bottom sheet, typographic.
+- Decisions locked with Rey: caregiver-voice prompts, tap Start then 3-2-1 countdown then automatic 3 s hold gated on loose steadiness, auto-retry on hand loss, check sound per label, no summary screen, straight into listening, samples saved per label, visible Retrain button resets.
 
 Blocked / need:
-- Browser integration needs Josh (`web/src/cv/`) and a contract line: our normalisation
-  (`wrist_relative_v1`) differs from s8. Not requested yet; testing first.
-- Augmentation unproven on impaired hands; needs the 9 PM simulated-impairment data.
+- Rey to pick a variation (or mix) before the React build starts.
 
 Next:
-- Two-hand 66-float feature (see `docs/ml-gestures.md`), then web pages per agents/rey.md.
+- Scaffold Vite 5 + React + TS + Tailwind v4 in `web/`, build /patient onboarding against Josh's `web/src/cv/` interface and the fixtures, then /caregiver and /beacon.
