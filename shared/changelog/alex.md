@@ -22,4 +22,6 @@
 
 2026-10-18 | Installed the merged caregiver script on the Pi OS device at 172.20.10.6 and restarted `carecall-caregiver`. Verified the remote script hash matches, systemd reports it active (exit status 0), and Railway caregiver heartbeat health returns HTTP 200.
 
-2026-10-18 | Pulled `main` to a3fffbd and updated `/data/home/qnxuser/care-call` on the QNX Pi with the tracked project plus a production frontend build. Preserved the Pi's local `.env` and `.venv`. Verified `/patient` serves, the bundle points to Railway, Railway health is `{"ok":true}` from QNX, and bedside Python files compile. Build, 15 web tests and 68 CV tests pass.
+2026-10-18 | Pulled `main` to d30a838 and updated `/data/home/qnxuser/care-call` on the QNX Pi with the tracked project plus a production frontend build. Preserved the Pi's local `.env` and `.venv`. Verified `/patient` serves, the bundle points to Railway, Railway health is `{"ok":true}` from QNX, and bedside Python files compile. Build, 15 web tests and 68 CV tests pass.
+
+2026-10-18 | Final audit against main d30a838: caregiver Pi script hash matches current main, systemd service is active and Railway heartbeat health is 200; QNX frontend and bedside code hashes match, patient page is 200 and Railway health succeeds. No runtime changes after the installs, so neither Pi needed a software update.
