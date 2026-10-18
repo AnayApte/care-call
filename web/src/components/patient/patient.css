@@ -64,6 +64,7 @@
 
 .live-word { color: #fff; font-size: min(var(--text-word-live), 18vh); font-weight: 700; letter-spacing: -0.02em; position: absolute; left: 72px; bottom: 160px; margin: 0; line-height: 1;
   text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
+.live-word.result { color: var(--pine-soft); }
 .live-sub { position: absolute; left: 74px; bottom: 110px; color: rgba(255, 255, 255, 0.78); font-size: 22px; margin: 0; }
 .live-ring { position: absolute; right: 88px; bottom: 88px; }
 .notice { position: absolute; left: 72px; bottom: 46px; color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 0; }

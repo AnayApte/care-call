@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { Deck } from "@/components/patient/Deck";
 import { HandCanvas } from "@/components/patient/HandOverlay";
@@ -10,13 +10,19 @@ import "@/components/patient/patient.css";
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { state, start, retrain } = useOnboarding(videoRef, canvasRef);
-  const { phase, index, countdown, progress, hint, lifting, trigger, lastSent, toast } = state;
+  const { state, start, retrain, dismiss } = useOnboarding(videoRef, canvasRef);
+  const { phase, index, countdown, progress, hint, lifting, trigger, result, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
-  const liveWord = lastSent ?? trigger.label;
+  const deciding = !result && trigger.progress > 0;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.code === "Space" && result) { e.preventDefault(); dismiss(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [result, dismiss]);
 
   return (
-    <main className="relative h-full overflow-hidden">
+    <main className="relative h-full overflow-hidden" onClick={result ? dismiss : undefined}>
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
         <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
         <HandCanvas ref={canvasRef} />
@@ -57,12 +63,12 @@ export default function PatientPage() {
 
       {phase === "listening" && (
         <>
-          <button type="button" className="btn-retrain" onClick={retrain}>Retrain movements</button>
-          <h2 className="live-word">{liveWord ? DISPLAY_WORD[liveWord] : "Ready"}</h2>
-          <p className="live-sub">{lastSent ? "Request sent. Help is on the way." : liveWord ? "Keep holding to send the request." : "Watching for a movement. Make one and hold it."}</p>
+          <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); void retrain(); }}>Retrain movements</button>
+          <h2 className={`live-word ${result ? "result" : ""}`}>{result ? DISPLAY_WORD[result] : deciding ? "Hold it" : "Ready"}</h2>
+          <p className="live-sub">{result ? "Request sent. Tap the screen or press space to continue." : deciding ? "Keep holding while the ring fills." : "Watching for a movement."}</p>
           <div className="live-ring">
-            <Ring progress={lastSent ? 1 : trigger.progress} mode={lastSent ? "done" : "hold"} large small>
-              {lastSent ? <CheckMark /> : trigger.cooldownMs > 0 ? "Sent" : trigger.label ? "Sending" : ""}
+            <Ring progress={result ? 1 : trigger.progress} mode={result ? "done" : "hold"} large small>
+              {result ? <CheckMark /> : ""}
             </Ring>
           </div>
           <p className="notice">Assistive prototype, not a medical device.</p>
