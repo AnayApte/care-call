@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fixturePatient, type Patient } from "@/lib/api";
-import { createGestureTrigger, createPersonalClassifier, createSampleCapture, startHandTracker, type HandFrame, type Label, type Sample, type TriggerState } from "@/lib/cv";
+import { createGestureTrigger, createHandArbiter, createPersonalClassifier, createSampleCapture, startHandTracker, type Handedness, type Label, type Sample, type TrackedFrame, type TriggerState } from "@/lib/cv";
+import { loadHandedness, saveHandedness } from "@/lib/handednessPref";
 import { TRAINING_ORDER } from "@/lib/labels";
 import { sounds } from "@/lib/sounds";
 import { createSteadinessGate } from "@/lib/steady";
@@ -47,7 +48,7 @@ function completeLabels(samples: Sample[]): Set<Label> {
   return new Set([...counts].filter(([, n]) => n >= SAMPLES_PER_LABEL).map(([l]) => l));
 }
 
-export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>, cameraId?: string) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, countdown: 0, progress: 0, hint: "", lifting: null,
     handPresent: false, trigger: idleTrigger, result: null, accuracy: null, feedback: null, toast: null,
@@ -64,6 +65,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     gate: createSteadinessGate(),
     classifier: createPersonalClassifier(),
     trigger: createGestureTrigger(),
+    /** Which hand counts. Learns from training holds, then locks to the hand the patient trained with. */
+    arbiter: createHandArbiter({ locked: loadHandedness() }),
+    /** Hand seen in the most recent hold frame, cast as a vote when the hold completes. */
+    holdHandedness: null as Handedness | null,
     timers: [] as number[],
     listenGraceUntil: 0,
     handPresent: false,
@@ -105,11 +110,20 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     later(() => { sounds.tick(); beginHold(); }, COUNTDOWN_MS);
   }, [setPhase, later, beginHold]);
 
+  /** A completed hold with a known hand is a vote for that hand. The majority becomes the lock and is remembered. */
+  const voteHand = useCallback(() => {
+    const s = session.current;
+    if (!s.holdHandedness) return;
+    s.arbiter.vote(s.holdHandedness);
+    saveHandedness(s.arbiter.lock());
+  }, []);
+
   const finishLabel = useCallback((samples: Sample[]) => {
     const s = session.current;
     const label = TRAINING_ORDER[s.index];
     s.samples = [...s.samples, ...samples];
     s.capture = null;
+    voteHand();
     sounds.check();
     setPhase("done", { progress: 1, lifting: null, hint: s.index + 1 < TRAINING_ORDER.length ? `Next: ${TRAINING_ORDER[s.index + 1]}.` : "That is all five." });
     void Promise.all(samples.map((smp) => api.postSample(smp.label, smp.vector))).then((results) => {
@@ -127,11 +141,12 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       s.handSeenSince = null;
       setPhase("waiting", { index: s.index, lifting: label, progress: 0, hint: "Any movement they can repeat works." });
     }, DONE_SHOW_MS);
-  }, [setPhase, later, toast]);
+  }, [setPhase, later, toast, voteHand]);
 
-  const onFrame = useCallback((frame: HandFrame) => {
+  const onFrame = useCallback((frame: TrackedFrame) => {
     const s = session.current;
     const present = frame.vector !== null;
+    if (present) s.holdHandedness = frame.handedness;
     const tone: HandTone = s.phase === "holding" || s.phase === "listening" ? "live" : "faint";
     if (canvasRef.current && videoRef.current) drawHand(canvasRef.current, videoRef.current, frame.landmarks, tone);
     if (present !== s.handPresent) { s.handPresent = present; patch({ handPresent: present }); }
@@ -234,15 +249,15 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     let stop: (() => void) | null = null;
     let cancelled = false;
     const controller = new AbortController();
-    const trigger = session.current.trigger;
+    const { trigger, arbiter } = session.current;
     startHandTracker(video, onFrame, (err) => {
       const name = err instanceof Error ? err.name : "";
       toast(name === "NotAllowedError" ? "Camera blocked. Allow camera access in the address bar and reload." : "No camera found or it is in use by another app.", "error");
-    }, () => toast("Hand model failed to load. Check the network and reload.", "error"), controller.signal)
+    }, () => toast("Hand model failed to load. Check the network and reload.", "error"), controller.signal, cameraId, arbiter)
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
     return () => { cancelled = true; controller.abort(); stop?.(); trigger.reset(); };
-  }, [videoRef, onFrame, toast]);
+  }, [videoRef, onFrame, toast, cameraId]);
 
   useEffect(() => () => { session.current.timers.forEach((id) => window.clearTimeout(id)); }, []);
 
@@ -264,6 +279,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     const vectors = spreadFrames(s.firedVectors, FEEDBACK_SAMPLES);
     s.firedVectors = [];
     if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
+    if (wasCorrect && !s.arbiter.lock()) voteHand();
     if (!label || vectors.length === 0) { patch({ feedback: "done" }); return; }
     const fresh: Sample[] = vectors.map((vector) => ({ label, vector }));
     try {
@@ -278,7 +294,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (results.some((r) => !r.ok)) toast("Server unreachable, the correction is kept on this device", "error");
     });
     patch({ feedback: "done", accuracy: s.classifier.leaveOneOutAccuracy() });
-  }, [patch, toast]);
+  }, [patch, toast, voteHand]);
 
   const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
   const feedbackNo = useCallback(() => patch({ feedback: "correcting" }), [patch]);
@@ -297,6 +313,9 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.firedVectors = [];
     s.holdVectors = [];
     s.handSeenSince = null;
+    s.arbiter.reset();
+    s.holdHandedness = null;
+    saveHandedness(null);
     setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, result: null, accuracy: null, feedback: null, hint: "Any movement they can repeat works." });
     const r = await api.deleteSamples();
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
