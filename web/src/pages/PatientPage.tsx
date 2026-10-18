@@ -5,12 +5,13 @@ import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
 import { TRAINING_ORDER, DISPLAY_WORD } from "@/lib/labels";
+import { sounds } from "@/lib/sounds";
 import "@/components/patient/patient.css";
 
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { state, start, retrain, dismiss } = useOnboarding(videoRef, canvasRef);
+  const { state, retrain, dismiss } = useOnboarding(videoRef, canvasRef);
   const { phase, index, countdown, progress, hint, lifting, trigger, result, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
@@ -20,6 +21,14 @@ export default function PatientPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [result, dismiss]);
+
+  // Browsers only allow sound after a user gesture. Any tap or key on the page unlocks the cues.
+  useEffect(() => {
+    const unlock = () => sounds.unlock();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
+  }, []);
 
   return (
     <main className="relative h-full overflow-hidden" onClick={result ? dismiss : undefined}>
@@ -35,8 +44,8 @@ export default function PatientPage() {
           <div className="dock">
             {phase === "waiting" && (
               <>
-                <button type="button" className="btn-start" onClick={start} autoFocus>Start</button>
-                <p className="status">{state.handPresent ? "Ready" : "Waiting for a hand"}<small>{state.handPresent ? "Tap Start when they are ready." : "Bring the hand into the picture."}</small></p>
+                <Ring progress={0} mode="hold" small>{state.handPresent ? "Found" : ""}</Ring>
+                <p className="status">{state.handPresent ? "Hand found" : "Waiting for a hand"}<small>{state.handPresent ? "Starting in a moment. Keep it in the picture." : "Bring the hand into the picture to begin."}</small></p>
               </>
             )}
             {phase === "countdown" && (

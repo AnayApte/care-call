@@ -13,6 +13,7 @@ const HOLD_MS = 3000;
 const COUNTDOWN_FROM = 3;
 const HOLD_CAP_MS = 10000;
 const DONE_SHOW_MS = 1100;
+const AUTO_START_AFTER_MS = 900; // a hand must be in the picture this long before a card starts on its own
 const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
 
@@ -59,6 +60,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     listenGraceUntil: 0,
     handPresent: false,
     result: null as Label | null,
+    handSeenSince: null as number | null,
   });
 
   const patch = useCallback((p: Partial<OnboardingState>) => setState((s) => ({ ...s, ...p })), []);
@@ -112,6 +114,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         return;
       }
       s.index += 1;
+      s.handSeenSince = null;
       setPhase("waiting", { index: s.index, lifting: label, progress: 0, hint: "Any movement they can repeat works." });
     }, DONE_SHOW_MS);
   }, [setPhase, later, toast]);
@@ -122,6 +125,12 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     const tone: HandTone = s.phase === "holding" || s.phase === "listening" ? "live" : "faint";
     if (canvasRef.current && videoRef.current) drawHand(canvasRef.current, videoRef.current, frame.landmarks, tone);
     if (present !== s.handPresent) { s.handPresent = present; patch({ handPresent: present }); }
+    if (s.phase === "waiting") {
+      if (!present) { s.handSeenSince = null; return; }
+      s.handSeenSince ??= frame.timestamp;
+      if (frame.timestamp - s.handSeenSince >= AUTO_START_AFTER_MS) { s.handSeenSince = null; startCountdown(); }
+      return;
+    }
     if (s.phase === "holding") {
       const steady = s.gate.update(frame.landmarks);
       if (performance.now() - s.holdStartedAt > HOLD_CAP_MS) {
@@ -159,6 +168,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       return;
     }
   }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef]);
+
 
   // Load patient and samples, then pick the starting point.
   useEffect(() => {
@@ -216,6 +226,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.index = 0;
     s.trigger.reset();
     s.result = null;
+    s.handSeenSince = null;
     setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, result: null, hint: "Any movement they can repeat works." });
     const r = await api.deleteSamples();
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
