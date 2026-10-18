@@ -7,7 +7,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .. import config, escalation, store
-from ..integrations import photon
+from ..integrations import gemini, photon
 
 router = APIRouter()
 
@@ -44,8 +44,8 @@ def handle(text: str, request_id: Optional[str]) -> str:
             return "Nothing is open right now."
         lines = [f"- {r['display']} ({_age(r)} ago)" for r in open_reqs]
         return "Open requests:\n" + "\n".join(lines)
-    # Free-text questions go to Gemini later (contract section 10).
-    return HELP_TEXT
+    # Free-text questions go to Gemini with the last 24 hours as context (contract section 10).
+    return gemini.answer(text) or HELP_TEXT
 
 
 @router.post("/api/webhooks/photon")

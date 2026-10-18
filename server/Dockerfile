@@ -13,7 +13,8 @@ COPY server/photon-bridge/src src
 FROM python:3.12-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
-    DB_PATH=/data/carecall.db
+    DB_PATH=/data/carecall.db \
+    TTS_CACHE_DIR=/data/tts-cache
 
 COPY --from=bridge /usr/local/bin/node /usr/local/bin/node
 COPY --from=bridge /bridge server/photon-bridge

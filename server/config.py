@@ -42,3 +42,14 @@ PHOTON_BRIDGE_URL = os.environ.get("PHOTON_BRIDGE_URL", "http://127.0.0.1:8787")
 BRIDGE_SECRET = os.environ.get("BRIDGE_SECRET") or DEVICE_TOKEN
 # One or more caregiver phones, comma separated, e.g. +15551234567
 CAREGIVER_PHONES = [p.strip() for p in os.environ.get("CAREGIVER_PHONE", "").split(",") if p.strip()]
+
+# ElevenLabs text-to-speech. Audio is cached on disk by hash (on the Railway volume).
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "")
+ELEVENLABS_MODEL_ID = os.environ.get("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+TTS_CACHE_DIR = os.environ.get("TTS_CACHE_DIR", str(SERVER_DIR / "cache" / "tts"))
+
+# Gemini answers free-text iMessage questions (contract section 10).
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+# Tried in order: a model that is overloaded (503) or retired (404) falls through to the next.
+GEMINI_MODELS = [m.strip() for m in os.environ.get("GEMINI_MODELS", "gemini-3.5-flash,gemini-flash-latest,gemini-3.1-flash-lite").split(",") if m.strip()]
