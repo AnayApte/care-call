@@ -37,7 +37,14 @@ export function thresholdsFor(config: AdaptConfig, label: Label): Thresholds {
   return config.labels[label] ?? config;
 }
 export async function loadApprovedConfig(apiBase: string, patientId: string): Promise<AdaptConfig> {
-  const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/patients/${encodeURIComponent(patientId)}/adapt-config`);
+  // This endpoint contains approved settings only; never fetch or apply agent proposals here.
+  const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/patients/${encodeURIComponent(patientId)}/adapt-config`, {
+    signal: AbortSignal.timeout(8000), cache: "no-store",
+  });
   if (!response.ok) throw new Error(`Config load failed (${response.status})`);
-  return sanitizeAdaptConfig(await response.json());
+  const raw = record(await response.json());
+  if (![raw.version, raw.hold_frames, raw.min_confidence].every(x => typeof x === "number" && Number.isFinite(x))) {
+    throw new Error("Invalid approved settings");
+  }
+  return sanitizeAdaptConfig(raw);
 }

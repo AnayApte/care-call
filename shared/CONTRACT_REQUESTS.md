@@ -10,3 +10,15 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 2026-10-17 19:05 | rey | Trigger min confidence 0.8 feels too strict with real hands in testing; propose 0.7 and a time-based 1 s hold with gentle drain instead of 12 consecutive frames | detection now runs at 30 fps so 12 frames is only 0.4 s, and one odd frame should not wipe the ring
 
 2026-10-17 | josh | Josh asked to complete step 4. Connected his CV code to Rey's patient page on josh/patient-integration; small bridge, onboarding and status-message edits are included for review. Camera runs at 12 fps with the current contract's hold and confidence settings. No server, hardware or model weights changed.
+
+2026-10-17 | josh | Step 5 connects reports, approved settings and selective retraining through the patient hook. Keeps Rey's PR #13 UI and PR #14 feedback; explicit corrections enter reports. The patient page uses Josh's configurable contract trigger at up to 12 observations/sec while the camera stays smooth. Rey's time-based trigger is unchanged. Please add idempotent session ingestion and atomic per-label sample replacement; the current API can duplicate a report after a lost reply and retains old examples. No server or agent code changed by Josh.
+
+2026-10-17 | josh | Josh asked to finish CREAO and caregiver Apply. Added GET /api/adapt/setup (ready only), GET /api/patients/{id}/sessions (latest five), base_config in the run response, and optional expected_version on the settings PUT to reject outdated approval atomically. Server and caregiver edits are authorized for this request. Shared contract and fixtures are unchanged.
+
+2026-10-17 | josh | Josh requested a small report popup and a separate detailed route. Added /caregiver/reports/{run-id}, with Apply/Dismiss on that page. Completed reports and their approval context are saved in this browser; direct links without that context are read-only. No API changes or new libraries.
+
+2026-10-17 | josh | Josh requested navigation from the patient screen to caregiver reports. Added a visible link to /caregiver during setup and regular use. Patient page and styling edits are authorized for this request.
+
+2026-10-17 | josh | Josh requested hand-controlled Yes/No feedback. Added fixed thumbs-up/down detection while that prompt is open, with a one-second hold and release first. Patient hook, page and styling edits are authorized. Buttons, request learning and CREAO approval stay separate. No API changes or new libraries.
+
+2026-10-17 | josh | Josh identified that patient thumbs could be mistaken for caregiver answers. Removed shared-camera thumb input and kept explicit caregiver buttons. A separate caregiver camera flow needs its own review context; handedness is not identity.

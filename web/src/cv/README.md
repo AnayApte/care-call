@@ -2,6 +2,7 @@
 
 For step 4, the patient gesture flow is connected at `/patient`.
 Setup and checks: [GESTURES.md](./GESTURES.md).
+Approved settings and usage reports: [STEP5.md](./STEP5.md).
 
 Open `/src/cv/armDemo.html` in the web dev server.
 

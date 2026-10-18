@@ -4,12 +4,11 @@ import { Deck } from "@/components/patient/Deck";
 import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
+import { DISPLAY_WORD } from "@/lib/labels";
+import { REQUEST_LABELS, USE_MOCK_HAND } from "@/lib/cv";
 import { CameraSelect } from "@/components/patient/CameraSelect";
 import { loadCameraId } from "@/lib/cameraPref";
-import { TRAINING_ORDER, DISPLAY_WORD } from "@/lib/labels";
-import { REQUEST_LABELS } from "@/lib/cv";
 import { sounds } from "@/lib/sounds";
-import { USE_MOCK_HAND } from "@/lib/cv";
 import "@/components/patient/patient.css";
 
 export default function PatientPage() {
@@ -17,7 +16,7 @@ export default function PatientPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraId, setCameraId] = useState(loadCameraId);
   const { state, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect } = useOnboarding(videoRef, canvasRef, cameraId);
-  const { phase, index, progress, hint, lifting, trigger, result, feedback, toast } = state;
+  const { phase, index, order, progress, hint, lifting, trigger, result, delivery, feedback, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
 
@@ -45,8 +44,8 @@ export default function PatientPage() {
 
       {onboarding && (
         <>
-          <StepRail total={TRAINING_ORDER.length} index={index} />
-          <Deck order={TRAINING_ORDER} index={index} lifting={lifting} hint={hint} done={phase === "done"} />
+          <StepRail total={order.length} index={index} />
+          <Deck order={order} index={index} lifting={lifting} hint={hint} done={phase === "done"} />
           <div className="dock">
             {phase === "waiting" && (
               <>
@@ -80,17 +79,20 @@ export default function PatientPage() {
         <>
           <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); void retrain(); }}>Retrain movements</button>
           <h2 className={`live-word ${result ? "result" : ""}`}>{result ? DISPLAY_WORD[result] : deciding ? "Hold it" : "Ready"}</h2>
-          <p className="live-sub">{result ? "Request sent. Waiting for a caregiver. Tap the screen or press space to continue." : deciding ? "Keep holding while the ring fills." : "Watching for a movement."}</p>
+          <p className="live-sub">{result ? delivery === "sent"
+            ? "Request sent. Waiting for a caregiver. Tap the screen or press space to continue."
+            : delivery === "failed" ? "Request status unavailable. Tap the screen or press space to continue."
+            : "Sending request…" : deciding ? "Keep holding while the ring fills." : "Watching for a movement."}</p>
           <div className="live-ring">
-            <Ring progress={result ? 1 : trigger.progress} mode={result ? "done" : "hold"} large small>
-              {result ? <CheckMark /> : ""}
+            <Ring progress={result ? 1 : trigger.progress} mode={delivery === "sent" ? "done" : "hold"} large small>
+              {delivery === "sent" ? <CheckMark /> : delivery === "sending" ? "Sending" : delivery === "failed" ? "Check" : ""}
             </Ring>
           </div>
           {result && feedback && feedback !== "done" && (
             <div className="feedback" onClick={(e) => e.stopPropagation()} role="group" aria-label="Was that right">
               {feedback === "asking" ? (
                 <>
-                  <p>Was that the right request?</p>
+                  <p>Caregiver check: was that right?</p>
                   <div className="row">
                     <button type="button" className="fb yes" onClick={feedbackYes}>Yes</button>
                     <button type="button" className="fb" onClick={feedbackNo}>No</button>
@@ -117,6 +119,7 @@ export default function PatientPage() {
       {phase === "loading" && <div className="toast">Starting camera</div>}
       {USE_MOCK_HAND && <p className="toast" style={{ top: "auto", bottom: 56 }}>Simulation: 0 rest, 1 water, 2 pain, 3 help, 4 bathroom, X hide</p>}
       {toast && <div className={`toast ${toast.kind === "error" ? "error" : ""}`} role="status">{toast.text}</div>}
+      <a className="patient-caregiver-link" href="/caregiver" onClick={(e) => e.stopPropagation()}>Caregiver reports <span aria-hidden="true">↗</span></a>
     </main>
   );
 }

@@ -20,6 +20,12 @@ router = APIRouter()
 FAILED = {"status": "failed", "proposal": None, "explanation_md": None}
 
 
+@router.get("/api/adapt/setup")
+def adapt_setup():
+    from ..integrations.creao import configuration_status
+    return configuration_status()
+
+
 def _creao():
     if not config.ENABLE_CREAO:
         raise HTTPException(503, "CREAO is turned off (ENABLE_CREAO=false)")
@@ -27,6 +33,8 @@ def _creao():
         from ..integrations import creao  # type: ignore[attr-defined]
     except ImportError:
         raise HTTPException(503, "integrations/creao.py does not exist yet")
+    if not creao.configuration_status()["ready"]:
+        raise HTTPException(503, "CREAO is not connected yet")
     return creao
 
 
@@ -61,7 +69,7 @@ def adapt_run(body: AdaptRunIn):
         log.error("creao.start_adaptation returned %r, not a job id", job_id)
         raise HTTPException(502, "could not start the CREAO run")
     log.info("adapt.run started %s with %d sessions", job_id, len(inputs["sessions"]))
-    return {"job_id": job_id}
+    return {"job_id": job_id, "base_config": inputs["config"]}
 
 
 @router.get("/api/adapt/{job_id}")

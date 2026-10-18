@@ -3,17 +3,34 @@
 Updated: 2026-10-17
 
 Works:
-- Step 4 connected to Rey's patient screen on josh/patient-integration.
-- Uses Josh's camera, personal classifier, recording and request trigger.
-- Simulated training saved 75 samples; Water reached the server and device alert state.
-- Failed sends show an error. Training check and hold progress appear on the page.
-- Latest Rey UI update included. 33 JavaScript tests, two server checks and web build pass.
+- Step 4 is merged into main in PR #12.
+- Step 5 is connected on josh/session-adaptation: usage reports and approved settings.
+- Failed reports are retained for retry. Settings apply between holds.
+- Selective Pain retraining kept all 60 other examples and survived refresh.
+- Per-label limits, report versions and retraining completion have automated checks.
+- Live approved-setting updates and Help-only retraining passed in browser simulation.
+- Includes Rey's PR #18 feedback: keeps different styles and records "Nothing" without training neutral.
+- Added the server CREAO adapter and caregiver report with explicit Apply and Dismiss on josh/creao-approval.
+- Refresh resumes the same review. Outdated suggestions cannot overwrite newer settings.
+- Simulated browser checks confirmed Dismiss saves nothing and Apply saves the shown settings.
+- CREAO agent created and connected locally with a private, agent-scoped key.
+- Real API run on four synthetic sessions reached the caregiver screen; explicit Apply saved Pain-only retraining.
+- Added a small summary popup and a readable full-report route on josh/report-popup.
+- Patient screen has a visible Caregiver reports link during setup and regular use.
+- Caregiver feedback uses buttons. Patient camera gestures cannot answer the caregiver's Yes/No check.
+- Removed shared-camera thumb feedback because it cannot tell the patient from the caregiver.
+- Reports survive refresh and Apply/Dismiss. Direct links without approval context are read-only.
+- Kept Rey's two-hand tracking and camera picker from PR #22 alongside Step 5.
+- 64 JavaScript tests, 16 server checks, TypeScript and the web build pass.
 - Earlier guided arm demo and browser beacon preview remain available.
 
 Next:
-- Review the patient integration PR with Rey, then test real camera movements together.
+- Review CREAO PR #21 after Step 5 PR #15. Setup and live evidence: docs/josh-creao.md.
+- Set CREAO variables privately on the deployed server; local keys are not pushed through Git.
+- Test real camera movements together.
 - Alex: test the caregiver Pi against the same server, including its buzzer and display.
 - Anay: update the shared plan for Josh's new goal and agree a richer observation format.
+- Anay: add session deduplication and atomic per-label sample replacement.
 
 Arm thresholds are unvalidated demo settings. This cannot diagnose or rule out stroke.
 Physical hardware has not been verified. The earlier gesture demo remains available.
