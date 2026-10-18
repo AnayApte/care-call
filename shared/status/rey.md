@@ -13,6 +13,10 @@ Works:
 - Two hands in frame: `web/src/lib/handArbiter.ts` decides which one counts. Training holds vote for the hand that did them; the majority locks and survives reload (`carecall.handedness` in localStorage). Once locked the weak hand is ignored even when it is the only hand visible, by design, so it cannot fire a false request. Retrain clears the lock. The lock is MediaPipe's label (mirrored on a selfie camera), so the UI never names a side. Tests: `cd web && npm test`.
 
 - Add a word after onboarding: "Add a word" pill next to "Retrain movements" on /patient. Saves the word on the server (`POST /api/patients/{id}/vocabulary`), trains just that word, then it can be requested like the defaults. Trigger gate is 0.65 (4 of 5 neighbours).
+- Deployed on Vercel: https://care-call-gamma.vercel.app (project `care-call` under rereynrd, root `web/`, `VITE_API_BASE` = the Railway server, set in Vercel for production and preview). `/patient`, `/caregiver`, `/beacon` and report links load directly. Not connected to GitHub (the Vercel app has no access to AnayApte/care-call), so redeploy by hand: `git archive HEAD web ml/baseline.json shared/fixtures` into a temp dir, copy `web/.vercel/project.json` to `.vercel/`, then `npx vercel deploy --prod`.
+- Hand model starts fast: loads alongside the camera, once per page, warmed on a blank frame, kept in the Cache API (`web/src/lib/modelLoader.ts`). "Reload camera" restarts only the camera.
+- Demo continue: after a request is sent, tap anywhere or press Space to go straight back to Ready (acks the open request).
+- Warm-up on /patient: "One moment" (3 s ring) after training, then "Relax" until Rest is recognised, then "Ready". After 6 s stuck on Rest, a "Re-record Rest" button re-trains only Rest. The prototype notice is removed from the live screen.
 
 Blocked / need:
 - Josh's `web/src/cv/` to merge, then swap the re-exports in `web/src/lib/cv.ts`. Note for Josh: Rey's page needs landmarks per frame as well as the vector (for the overlay and the steadiness gate).

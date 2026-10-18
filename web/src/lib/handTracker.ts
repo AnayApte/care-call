@@ -7,6 +7,7 @@ import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 import { extractFeatures as contractFeatures } from "../cv/features";
 import type { HandFrame } from "../cv/patient";
 import { createHandArbiter, type DetectedHand, type Handedness } from "./handArbiter";
+import { createMonotonicClock, fetchCached, loadOnce } from "./modelLoader";
 import type { Point } from "./steady";
 
 /** A contract `HandFrame` plus which hand it came from, for the handedness vote. */
@@ -17,6 +18,27 @@ const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20
 const MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 /** Exponential smoothing on landmark positions. 1 = raw, lower = smoother but laggier. */
 const SMOOTHING = 0.6;
+const MODEL_CACHE = "carecall-models-v1";
+const WARMUP_SIZE = 64;
+
+/**
+ * One detector per page, shared by every camera start, so changing or reloading the camera never waits for the
+ * ~17 MB of WASM and model again. The first GPU inference compiles shaders, so it runs once here on a blank canvas
+ * instead of stalling the first camera frame.
+ */
+const detectAt = createMonotonicClock();
+export const loadHandModel = loadOnce(async () => {
+  const [files, model] = await Promise.all([FilesetResolver.forVisionTasks(WASM), fetchCached(MODEL, MODEL_CACHE)]);
+  const detector = await HandLandmarker.createFromOptions(files, {
+    baseOptions: { modelAssetBuffer: model, delegate: "GPU" },
+    runningMode: "VIDEO",
+    numHands: 2,
+  });
+  const blank = document.createElement("canvas");
+  blank.width = blank.height = WARMUP_SIZE;
+  detector.detectForVideo(blank, detectAt(performance.now()));
+  return detector;
+});
 
 function extractFeatures(points: readonly Point[]): number[] | null {
   try { return contractFeatures(points); } catch { return null; }
@@ -48,13 +70,15 @@ export async function startRealHandTracker(
     cancelAnimationFrame(raf);
     stream?.getTracks().forEach((t) => t.stop());
     piImage = null;
-    detector?.close();
-    detector = null;
+    detector = null; // shared; kept loaded for the next camera start
     if (video.srcObject === stream) video.srcObject = null;
   };
   if (signal?.aborted) return stop;
   signal?.addEventListener("abort", stop, { once: true });
 
+  // Download the model while the camera starts (and while the permission prompt is open).
+  const model = loadHandModel();
+  model.catch(() => undefined); // reported below, after the camera
   try {
     if (deviceId === "pi-usb") {
       piImage = video.parentElement?.querySelector("img.pi-cam-preview") ?? null;
@@ -77,13 +101,9 @@ export async function startRealHandTracker(
   }
 
   try {
-    const files = await FilesetResolver.forVisionTasks(WASM);
+    const loaded = await model;
     if (stopped) return stop;
-    detector = await HandLandmarker.createFromOptions(files, {
-      baseOptions: { modelAssetPath: MODEL, delegate: "GPU" },
-      runningMode: "VIDEO",
-      numHands: 2,
-    });
+    detector = loaded;
   } catch (err) {
     onModelError?.(err);
     stop();
@@ -102,7 +122,7 @@ export async function startRealHandTracker(
       } else {
         lastVideoTime = video.currentTime;
       }
-      const result = detector.detectForVideo(piImage ?? video, now);
+      const result = detector.detectForVideo(piImage ?? video, detectAt(now));
       const hands: DetectedHand[] = result.landmarks.map((landmarks, i) => ({
         landmarks: landmarks as Point[],
         handedness: toHandedness(result.handedness[i]?.[0]?.categoryName),

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { saveCameraId } from "@/lib/cameraPref";
+import { OFFERS_LAPTOP_WEBCAM, OFFERS_PI_CAMERA, saveCameraId } from "@/lib/cameraPref";
 
-/** Production uses the Pi; the local dev demo also offers its computer's webcam. */
+/** The Pi-hosted build uses the Pi camera; the Vercel build uses the laptop webcam; dev offers both. */
 export function CameraSelect({ value, onChange }: { value: string | undefined; onChange: (id: string) => void }) {
-  const [selected, setSelected] = useState(value ?? "pi-usb");
+  const [selected, setSelected] = useState(value ?? (OFFERS_PI_CAMERA ? "pi-usb" : "local-webcam"));
 
   return (
     <label className="cam-select" onClick={(e) => e.stopPropagation()}>
@@ -13,8 +13,8 @@ export function CameraSelect({ value, onChange }: { value: string | undefined; o
         value={selected}
         onChange={(e) => { setSelected(e.target.value); saveCameraId(e.target.value); onChange(e.target.value); }}
       >
-        {import.meta.env.DEV && <option value="local-webcam">Laptop webcam (local demo)</option>}
-        <option value="pi-usb">Pi USB camera (unit 5)</option>
+        {OFFERS_LAPTOP_WEBCAM && <option value="local-webcam">Laptop webcam</option>}
+        {OFFERS_PI_CAMERA && <option value="pi-usb">Pi USB camera (unit 5)</option>}
       </select>
     </label>
   );

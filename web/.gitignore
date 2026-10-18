@@ -25,3 +25,5 @@ dist-ssr
 
 # Vite dependency cache
 .vite/
+.vercel
+.env*

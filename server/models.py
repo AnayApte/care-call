@@ -20,7 +20,7 @@ PATIENTS = {PATIENT["id"]: PATIENT}
 DEFAULT_ADAPT_CONFIG = {
     "version": 1,
     "hold_frames": 12,
-    "min_confidence": 0.8,
+    "min_confidence": 0.65,
     "labels": {},
     "retrain_labels": [],
     "suggest_replace": [],

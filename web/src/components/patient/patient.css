@@ -89,7 +89,7 @@
 .patient-warning button { margin-left: 12px; }
 .patient-tools button:focus-visible, .patient-warning button:focus-visible { outline: 3px solid #d8a24a; outline-offset: 3px; }
 .live-sub { max-width: calc(100% - 420px); }
-@media (max-width: 700px) { .patient-tools { left: 25px; top: 95px; max-width: 85%; }.patient-warning { left: 25px; right: 25px; top: 180px; }.delivery-warning { top: 240px; bottom: auto; }.live-word { left: 30px; }.live-sub { left: 30px; max-width: 65%; font-size: 18px; }.notice { left: 30px; bottom: 80px; font-size: 12px; }.live-ring { right: 25px; }.feedback { min-width: 0; width: 90%; top: 180px; } }
+@media (max-width: 700px) { .patient-tools { left: 25px; top: 95px; max-width: 85%; }.patient-warning { left: 25px; right: 25px; top: 180px; }.delivery-warning { top: 240px; bottom: auto; }.live-word { left: 30px; }.live-sub { left: 30px; max-width: 65%; font-size: 18px; }.warmup-action { left: 30px; bottom: 60px; }.live-ring { right: 25px; }.feedback { min-width: 0; width: 90%; top: 180px; } }
 
 .cam-select { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 6px 0 14px;
   border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.25); color: #fff; backdrop-filter: blur(6px);
@@ -105,8 +105,9 @@
   text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
 .live-word.result { color: var(--pine-soft); }
 .live-sub { position: absolute; left: 74px; bottom: 110px; color: rgba(255, 255, 255, 0.78); font-size: 22px; margin: 0; }
+.live-continue { display: block; margin-top: 6px; font-size: 15px; color: rgba(255, 255, 255, 0.6); }
 .live-ring { position: absolute; right: 88px; bottom: 88px; }
-.notice { position: absolute; left: 72px; bottom: 46px; color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 0; }
+.warmup-action { position: absolute; left: 72px; bottom: 40px; }
 
 .toast { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); background: rgba(27, 31, 29, 0.7); color: #fff; padding: 12px 22px; border-radius: 999px;
   font-size: 18px; backdrop-filter: blur(8px); }

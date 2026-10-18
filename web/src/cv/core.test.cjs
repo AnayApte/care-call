@@ -39,7 +39,7 @@ test('fires exactly on frame 12 at the confidence boundary, then cooldown', () =
   assert.equal(hold(engine, water, 9100).fired.label, 'water');
 });
 test('neutral, missing hand, low confidence, invalid confidence reset the hold', () => {
-  for (const interruption of [null, { label: 'neutral', confidence: 1 }, { label: 'water', confidence: .79 },
+  for (const interruption of [null, { label: 'neutral', confidence: 1 }, { label: 'water', confidence: .64 },
       { label: 'water', confidence: NaN }, { label: 'water', confidence: 2 }, { label: 'Not a label!', confidence: 1 }]) {
     const engine = createGestureTrigger();
     hold(engine, water, 0, 11);
@@ -68,6 +68,7 @@ test('approved per-label settings apply, clamp bounds and ignore unknown keys', 
   assert.equal(config.labels.surprise, undefined);
   assert.equal(config.cooldown, undefined);
   assert.equal(sanitizeAdaptConfig({ hold_frames: NaN }).hold_frames, 12);
+  assert.equal(sanitizeAdaptConfig({}).min_confidence, .65);
   const engine = createGestureTrigger(config);
   assert.equal(hold(engine, { label: 'water', confidence: .9 }, 0, 6).fired.label, 'water');
   engine.setConfig(null); // changing settings must not cancel the cooldown

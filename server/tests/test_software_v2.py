@@ -170,6 +170,11 @@ class SoftwareV2(unittest.TestCase):
             self.assertEqual(self.client.post("/api/adapt/run", json={"patient_id": "p_demo"}).status_code, 202)
             self.assertTrue(start.call_args.kwargs["sessions"][0]["live"])
 
+    def test_default_confidence_gate_is_065(self):
+        from server.models import DEFAULT_ADAPT_CONFIG
+        self.assertEqual(DEFAULT_ADAPT_CONFIG["min_confidence"], 0.65)
+        self.assertEqual(self.client.get("/api/patients/p_demo/adapt-config").json()["min_confidence"], 0.65)
+
 
 if __name__ == "__main__":
     unittest.main()

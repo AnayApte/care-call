@@ -20,7 +20,7 @@ function thresholds(x: Record<string, unknown>, fallback: Thresholds): Threshold
 /** Only pass approved server config here. This does not apply agent proposals. */
 export function sanitizeAdaptConfig(input: unknown): AdaptConfig {
   const raw = record(input);
-  const base = thresholds(raw, { hold_frames: 12, min_confidence: 0.8 });
+  const base = thresholds(raw, { hold_frames: 12, min_confidence: 0.65 });
   const labels: AdaptConfig["labels"] = {};
   const overrides = record(raw.labels);
   for (const label of LABELS) {

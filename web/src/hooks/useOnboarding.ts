@@ -23,6 +23,7 @@ const DONE_SHOW_MS = 1100;
 const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
 const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
+const RELEASE_STUCK_MS = 6000; // if Rest is not recognised by then, offer to re-record it
 
 export type OnboardingState = {
   phase: Phase;
@@ -45,6 +46,12 @@ export type OnboardingState = {
   trainingPending: number;
   trainingSaveError: string;
   feedback: "asking" | "correcting" | "done" | null;
+  /** Before listening can fire: "grace" while the last training pose is ignored, "release" until Rest is recognised. */
+  warmup: "grace" | "release" | null;
+  /** Grace progress, 0 to 1. */
+  warmupProgress: number;
+  /** Rest has not been recognised for a while; offer to re-record it. */
+  releaseStuck: boolean;
   /** Leave-one-out accuracy of the personal model, once all five labels are trained. */
   accuracy: number | null;
   toast: { text: string; kind: "info" | "error" } | null;
@@ -56,6 +63,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, order: TRAINING_ORDER, canSkip: false, countdown: 0, progress: 0, hint: "", lifting: null,
     handPresent: false, trigger: idleTrigger, result: null, feedback: null, accuracy: null, toast: null,
+    warmup: null, warmupProgress: 0, releaseStuck: false,
     flow: { phase: "waiting_release", request: null, input: null, error: "", online: true }, cameraError: "", savingTraining: false, trainingPending: 0, trainingSaveError: "",
   });
 
@@ -86,6 +94,9 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     holdHandedness: null as Handedness | null,
     timers: [] as number[],
     listenGraceUntil: 0,
+    warmup: null as OnboardingState["warmup"],
+    releaseWaitSince: null as number | null,
+    releaseStuck: false,
     handPresent: false,
     result: null as Label | null,
     resultRequestId: null as string | null,
@@ -209,6 +220,21 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     }, DONE_SHOW_MS);
   }, [setPhase, later, voteHand, sampleQueue, saveTraining, toast, flow]);
 
+  /** Tells the screen why it is not listening yet, so it never shows "Ready" while it cannot fire. */
+  const updateWarmup = useCallback(() => {
+    const s = session.current;
+    const now = performance.now();
+    const snap = flow.snapshot();
+    const warmup = now < s.listenGraceUntil ? "grace" : snap.phase === "waiting_release" && !snap.input ? "release" : null;
+    if (warmup === "release") s.releaseWaitSince ??= now; else s.releaseWaitSince = null;
+    const stuck = s.releaseWaitSince !== null && now - s.releaseWaitSince > RELEASE_STUCK_MS;
+    const progress = warmup === "grace" ? Math.min(1, 1 - (s.listenGraceUntil - now) / LISTEN_GRACE_MS) : 0;
+    if (warmup === "grace" || warmup !== s.warmup || stuck !== s.releaseStuck) {
+      s.warmup = warmup; s.releaseStuck = stuck;
+      patch({ warmup, warmupProgress: progress, releaseStuck: stuck });
+    }
+  }, [flow, patch]);
+
   const onFrame = useCallback((frame: TrackedFrame) => {
     const s = session.current;
     s.lastFrameAt = performance.now();
@@ -259,6 +285,8 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       s.lastPredictionAt = frame.timestamp;
       const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
       flow.observe(prediction, frame.timestamp);
+      updateWarmup();
+      if (import.meta.env.DEV) (window as unknown as { __ccDebug?: unknown }).__ccDebug = { prediction, flow: flow.snapshot().phase, ready: s.classifier.isReady(), samples: s.samples.length };
       if (flow.snapshot().phase !== "ready") {
         s.trigger.reset(); s.triggerState = idleTrigger;
         patch({ trigger: idleTrigger });
@@ -281,7 +309,6 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       // Keep the contract's 12 observations about one second while the overlay stays smooth.
       const next = s.trigger.update(prediction, frame.timestamp);
       s.triggerState = next;
-      if (import.meta.env.DEV) (window as unknown as { __ccDebug?: unknown }).__ccDebug = { prediction, next, ready: s.classifier.isReady(), samples: s.samples.length };
       patch({ trigger: next });
       if (next.fired) {
         const fired = next.fired;
@@ -291,7 +318,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       }
       return;
     }
-  }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef, applyConfig, setPhase, flow]);
+  }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef, applyConfig, setPhase, flow, updateWarmup]);
 
   // Load patient and samples, then pick the starting point.
   useEffect(() => {
@@ -352,6 +379,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       () => toast("Usage report not sent. It is kept for retry.", "error"));
   }, [reports, toast]);
 
+  // Bumping this restarts the camera only; the hand model stays loaded.
+  const [cameraAttempt, setCameraAttempt] = useState(0);
+  const reloadCamera = useCallback(() => setCameraAttempt((n) => n + 1), []);
+
   // Camera and frame loop.
   useEffect(() => {
     const video = videoRef.current;
@@ -370,7 +401,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
     return () => { cancelled = true; controller.abort(); stop?.(); trigger.reset(); };
-  }, [videoRef, onFrame, toast, cameraId, patch, flow]);
+  }, [videoRef, onFrame, toast, cameraId, cameraAttempt, patch, flow]);
 
   useEffect(() => () => { session.current.timers.forEach((id) => window.clearTimeout(id)); }, []);
 
@@ -400,6 +431,16 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     return () => { window.clearInterval(watchdog); document.removeEventListener("visibilitychange", visibility); };
   }, [flow, patch, setPhase]);
   const dismiss = useCallback(() => flow.recoverFailed(), [flow]);
+  /** Demo tap or Space: marks the request handled and goes straight back to Ready. */
+  const continueDemo = useCallback(async () => {
+    const { skipped, ackError } = await flow.skip();
+    if (!skipped) return;
+    const s = session.current;
+    s.trigger.reset();
+    s.triggerState = idleTrigger;
+    patch({ trigger: idleTrigger, feedback: null });
+    if (ackError) toast(`Back to Ready, but the caregiver unit may still show it: ${ackError}`, "error");
+  }, [flow, patch, toast]);
 
   /** Save an explicit correctness vote. Guided recording changes personal samples. */
   const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
@@ -478,6 +519,24 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     return null;
   }, [patch, setPhase, flow]);
 
+  /** Re-records only Rest, for when listening cannot start because Rest is not recognised. */
+  const rerecordRest = useCallback(() => {
+    const s = session.current;
+    if (flow.snapshot().input) return;
+    s.timers.forEach((id) => window.clearTimeout(id));
+    s.timers = [];
+    s.order = ["neutral"];
+    s.index = 0;
+    s.capture = null;
+    s.handSeenSince = null;
+    s.trigger.reset();
+    s.triggerState = idleTrigger;
+    s.releaseWaitSince = null; s.releaseStuck = false; s.warmup = null;
+    flow.interrupt();
+    setPhase("waiting", { order: s.order, index: 0, canSkip: false, lifting: null, progress: 0, trigger: idleTrigger,
+      warmup: null, releaseStuck: false, hint: "Rest the hand the way it normally sits." });
+  }, [setPhase, flow]);
+
   /** Leaves an added word untrained and goes back to listening. It is offered again on the next load. */
   const skipWord = useCallback(() => {
     const s = session.current;
@@ -491,7 +550,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     setPhase("listening", { canSkip: false, lifting: null, progress: 0, trigger: idleTrigger, toast: null });
   }, [setPhase, flow]);
 
-  return { state, start: startCountdown, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect,
+  return { state, start: startCountdown, retrain, reloadCamera, dismiss, continueDemo, feedbackYes, feedbackNo, feedbackCorrect,
     feedbackSkip: () => patch({ feedback: "done" }), retryRequest: flow.retry, checkRequest: flow.poll,
-    saveTraining, addWord, skipWord, setPaused };
+    saveTraining, addWord, skipWord, setPaused, rerecordRest };
 }
