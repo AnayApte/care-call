@@ -11,7 +11,6 @@ import { drawHand, type HandTone } from "@/lib/drawHand";
 import { loadApprovedConfig, sanitizeAdaptConfig, type AdaptConfig } from "@/cv/adapt";
 import { browserStore, createSessionReporter, startSessionReporting } from "@/cv/sessionReporter";
 import { createRetrainingPlan, replaceLabelSamples } from "@/cv/retraining";
-import { createThumbFeedback, idleThumbFeedback, type ThumbFeedbackState } from "@/cv/thumbFeedback";
 
 export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "listening";
 
@@ -36,11 +35,10 @@ export type OnboardingState = {
   lifting: Label | null;
   handPresent: boolean;
   trigger: TriggerState;
-  /** Recognised word, shown until dismissed with a tap or the spacebar. */
+  /** Recognised word, shown until the caregiver dismisses it with a tap or the spacebar. */
   result: Label | null;
   delivery: "sending" | "sent" | "failed" | null;
   feedback: "asking" | "correcting" | "done" | null;
-  feedbackHand: ThumbFeedbackState;
   /** Leave-one-out accuracy of the personal model, once all five labels are trained. */
   accuracy: number | null;
   toast: { text: string; kind: "info" | "error" } | null;
@@ -51,7 +49,7 @@ const idleTrigger: TriggerState = { label: null, progress: 0, cooldownMs: 0, fir
 export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>, cameraId?: string) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, order: TRAINING_ORDER, countdown: 0, progress: 0, hint: "", lifting: null,
-    handPresent: false, trigger: idleTrigger, result: null, delivery: null, feedback: null, feedbackHand: idleThumbFeedback, accuracy: null, toast: null,
+    handPresent: false, trigger: idleTrigger, result: null, delivery: null, feedback: null, accuracy: null, toast: null,
   });
 
   const reportsRef = useRef<ReturnType<typeof createSessionReporter> | null>(null);
@@ -84,7 +82,6 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     resultRequestId: null as string | null,
     pendingFeedback: null as boolean | null,
     feedbackAnswered: false,
-    thumbFeedback: createThumbFeedback(),
     holdVectors: [] as number[][],
     firedVectors: [] as number[][],
     handSeenSince: null as number | null,
@@ -173,45 +170,6 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     }, DONE_SHOW_MS);
   }, [setPhase, later, toast, voteHand]);
 
-  /** Keep Rey's feedback learning. "Nothing" is reported as a false trigger without teaching neutral. */
-  const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
-    const s = session.current;
-    if (!s.result || s.feedbackAnswered) return;
-    s.feedbackAnswered = true;
-    s.thumbFeedback.cancel();
-    patch({ feedbackHand: idleThumbFeedback });
-    reports.recordFeedback(label ?? "neutral", s.result);
-    const vectors = spreadFrames(s.firedVectors, FEEDBACK_SAMPLES);
-    s.firedVectors = [];
-    if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
-    else s.pendingFeedback = wasCorrect;
-    if (wasCorrect && !s.arbiter.lock()) voteHand();
-    if (!label || vectors.length === 0) { patch({ feedback: "done" }); return; }
-    const fresh: Sample[] = vectors.map(vector => ({ label, vector }));
-    try {
-      const nextSamples = trimSamples([...s.samples, ...fresh]);
-      s.classifier.setSamples(nextSamples);
-      s.samples = nextSamples;
-    } catch {
-      toast("Could not update the model from that feedback", "error");
-      patch({ feedback: "done" });
-      return;
-    }
-    void Promise.all(fresh.map(smp => api.postSample(smp.label, smp.vector))).then(results => {
-      if (results.some(r => !r.ok)) toast("Server unreachable, the correction is kept on this device", "error");
-    });
-    patch({ feedback: "done", accuracy: s.classifier.leaveOneOutAccuracy() });
-  }, [patch, reports, toast, voteHand]);
-  const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
-  const feedbackNo = useCallback(() => {
-    const s = session.current;
-    if (!s.result || s.feedbackAnswered) return;
-    s.thumbFeedback.cancel();
-    patch({ feedback: "correcting", feedbackHand: idleThumbFeedback });
-  }, [patch]);
-  /** `label` is what they actually meant. "Nothing" (null) only records the miss; it does not teach the model. */
-  const feedbackCorrect = useCallback((label: Label | null) => learnFrom(label, false), [learnFrom]);
-
   const onFrame = useCallback((frame: TrackedFrame) => {
     const s = session.current;
     const present = frame.vector !== null;
@@ -254,18 +212,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       return;
     }
     if (s.phase === "listening") {
-      if (s.result) {
-        s.trigger.reset();
-        if (s.thumbFeedback.isActive()) {
-          const video = videoRef.current;
-          const aspect = video?.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 1;
-          const thumb = s.thumbFeedback.update(frame.landmarks, frame.timestamp, aspect);
-          patch({ feedbackHand: thumb });
-          if (thumb.confirmed === "yes") feedbackYes();
-          else if (thumb.confirmed === "no") feedbackNo();
-        }
-        return;
-      }
+      if (s.result) { s.trigger.reset(); return; }
       // Approved updates wait for the current hold to finish; the engine keeps its cooldown.
       if (s.pendingConfig && s.triggerState.progress === 0) {
         applyConfig(s.pendingConfig);
@@ -299,12 +246,11 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         s.resultRequestId = null;
         s.pendingFeedback = null;
         s.feedbackAnswered = false;
-        s.thumbFeedback.begin();
         s.firedVectors = s.holdVectors;
         s.holdVectors = [];
         const serial = ++s.requestSerial;
         sounds.check();
-        patch({ result: fired.label, delivery: "sending", feedback: "asking", feedbackHand: idleThumbFeedback });
+        patch({ result: fired.label, delivery: "sending", feedback: "asking" });
         void api.createRequest(fired.label, fired.confidence).then((r) => {
           if (serial !== s.requestSerial) return;
           patch({ delivery: r.ok ? "sent" : "failed" });
@@ -320,7 +266,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       }
       return;
     }
-  }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef, applyConfig, setPhase, feedbackYes, feedbackNo]);
+  }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef, applyConfig, setPhase]);
 
   // Load patient and samples, then pick the starting point.
   useEffect(() => {
@@ -383,14 +329,14 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     let stop: (() => void) | null = null;
     let cancelled = false;
     const controller = new AbortController();
-    const { trigger, arbiter, thumbFeedback } = session.current;
+    const { trigger, arbiter } = session.current;
     startHandTracker(video, onFrame, (err) => {
       const name = err instanceof Error ? err.name : "";
       toast(name === "NotAllowedError" ? "Camera blocked. Allow camera access in the address bar and reload." : "No camera found or it is in use by another app.", "error");
     }, () => toast("Hand model failed to load. Check the network and reload.", "error"), controller.signal, cameraId, arbiter)
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
-    return () => { cancelled = true; controller.abort(); stop?.(); trigger.reset(); thumbFeedback.reset(); };
+    return () => { cancelled = true; controller.abort(); stop?.(); trigger.reset(); };
   }, [videoRef, onFrame, toast, cameraId]);
 
   useEffect(() => () => { session.current.timers.forEach((id) => window.clearTimeout(id)); }, []);
@@ -400,7 +346,6 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     const s = session.current;
     if (!s.result) return;
     s.result = null;
-    s.thumbFeedback.cancel();
     s.requestSerial++;
     s.resultRequestId = null;
     s.pendingFeedback = null;
@@ -409,8 +354,40 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.trigger.reset();
     s.triggerState = idleTrigger;
     s.lastPredictionAt = -Infinity;
-    patch({ result: null, delivery: null, feedback: null, feedbackHand: idleThumbFeedback, trigger: idleTrigger });
+    patch({ result: null, delivery: null, feedback: null, trigger: idleTrigger });
   }, [patch]);
+
+  /** Keep Rey's feedback learning. "Nothing" is reported as a false trigger without teaching neutral. */
+  const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
+    const s = session.current;
+    if (!s.result || s.feedbackAnswered) return;
+    s.feedbackAnswered = true;
+    reports.recordFeedback(label ?? "neutral", s.result);
+    const vectors = spreadFrames(s.firedVectors, FEEDBACK_SAMPLES);
+    s.firedVectors = [];
+    if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
+    else s.pendingFeedback = wasCorrect;
+    if (wasCorrect && !s.arbiter.lock()) voteHand();
+    if (!label || vectors.length === 0) { patch({ feedback: "done" }); return; }
+    const fresh: Sample[] = vectors.map(vector => ({ label, vector }));
+    try {
+      const nextSamples = trimSamples([...s.samples, ...fresh]);
+      s.classifier.setSamples(nextSamples);
+      s.samples = nextSamples;
+    } catch {
+      toast("Could not update the model from that feedback", "error");
+      patch({ feedback: "done" });
+      return;
+    }
+    void Promise.all(fresh.map(smp => api.postSample(smp.label, smp.vector))).then(results => {
+      if (results.some(r => !r.ok)) toast("Server unreachable, the correction is kept on this device", "error");
+    });
+    patch({ feedback: "done", accuracy: s.classifier.leaveOneOutAccuracy() });
+  }, [patch, reports, toast, voteHand]);
+  const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
+  const feedbackNo = useCallback(() => patch({ feedback: "correcting" }), [patch]);
+  /** `label` is what they actually meant. "Nothing" (null) only records the miss; it does not teach the model. */
+  const feedbackCorrect = useCallback((label: Label | null) => learnFrom(label, false), [learnFrom]);
 
   const retrain = useCallback(async () => {
     const s = session.current;
@@ -422,7 +399,6 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.retraining.reset();
     s.trigger.reset();
     s.result = null;
-    s.thumbFeedback.cancel();
     s.requestSerial++;
     s.resultRequestId = null;
     s.pendingFeedback = null;
@@ -434,7 +410,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     saveHandedness(null);
     s.lastPredictionAt = -Infinity;
     s.triggerState = idleTrigger;
-    setPhase("waiting", { index: 0, order: s.order, lifting: null, progress: 0, trigger: idleTrigger, result: null, delivery: null, feedback: null, feedbackHand: idleThumbFeedback, accuracy: null, hint: "Any movement they can repeat works." });
+    setPhase("waiting", { index: 0, order: s.order, lifting: null, progress: 0, trigger: idleTrigger, result: null, delivery: null, feedback: null, accuracy: null, hint: "Any movement they can repeat works." });
     const r = await api.deleteSamples();
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
   }, [setPhase, toast]);

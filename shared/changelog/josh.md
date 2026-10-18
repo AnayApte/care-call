@@ -31,3 +31,5 @@
 2026-10-17 | Added Caregiver reports to the patient screen so the summary and full report are easy to find.
 
 2026-10-17 | Added thumbs-up Yes and thumbs-down No to request feedback. Relax first, then hold for one second; the buttons still work. Nine thumb checks and three isolated frame/API flows passed, including learning from the original request rather than the thumb. Build, typecheck and lint pass with one existing warning. Real-camera testing remains.
+
+2026-10-17 | Removed shared-camera thumb feedback after Josh identified the patient/caregiver overlap. The camera cannot establish who answered. Kept caregiver Yes/No buttons and made their role clear. Simulated patient thumbs leave the prompt unanswered; manual Yes/No and corrections still work. Build, typecheck and changed-file lint pass.

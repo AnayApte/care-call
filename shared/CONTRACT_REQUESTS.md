@@ -20,3 +20,5 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 2026-10-17 | josh | Josh requested navigation from the patient screen to caregiver reports. Added a visible link to /caregiver during setup and regular use. Patient page and styling edits are authorized for this request.
 
 2026-10-17 | josh | Josh requested hand-controlled Yes/No feedback. Added fixed thumbs-up/down detection while that prompt is open, with a one-second hold and release first. Patient hook, page and styling edits are authorized. Buttons, request learning and CREAO approval stay separate. No API changes or new libraries.
+
+2026-10-17 | josh | Josh identified that patient thumbs could be mistaken for caregiver answers. Removed shared-camera thumb input and kept explicit caregiver buttons. A separate caregiver camera flow needs its own review context; handedness is not identity.
