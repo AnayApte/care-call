@@ -1,11 +1,17 @@
 /** Hand tracking with MediaPipe for the patient screen. Same model and WASM version as Josh's `cv/camera.ts`, and his
  * `extractFeatures`, so stored samples are identical. Differences: detects on every camera frame instead of 12 per
- * second, and smooths landmarks, because the patient screen draws the skeleton live.
+ * second, smooths landmarks because the patient screen draws the skeleton live, and asks for two hands so the
+ * arbiter can keep the patient's weak hand from being mistaken for the one that signals.
  */
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 import { extractFeatures as contractFeatures } from "../cv/features";
 import type { HandFrame } from "../cv/patient";
+import { createHandArbiter, type DetectedHand, type Handedness } from "./handArbiter";
 import type { Point } from "./steady";
+
+/** A contract `HandFrame` plus which hand it came from, for the handedness vote. */
+export type TrackedFrame = HandFrame & { handedness: Handedness | null };
+export type HandArbiter = ReturnType<typeof createHandArbiter>;
 
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
@@ -16,12 +22,18 @@ function extractFeatures(points: readonly Point[]): number[] | null {
   try { return contractFeatures(points); } catch { return null; }
 }
 
+function toHandedness(label: string | undefined): Handedness | null {
+  return label === "Left" || label === "Right" ? label : null;
+}
+
 export async function startRealHandTracker(
   video: HTMLVideoElement,
-  onFrame: (frame: HandFrame) => void,
+  onFrame: (frame: TrackedFrame) => void,
   onCameraError?: (err: unknown) => void,
   onModelError?: (err: unknown) => void,
   signal?: AbortSignal,
+  deviceId?: string,
+  arbiter: HandArbiter = createHandArbiter(),
 ): Promise<() => void> {
   let stream: MediaStream | null = null;
   let detector: HandLandmarker | null = null;
@@ -29,6 +41,7 @@ export async function startRealHandTracker(
   let raf = 0;
   let lastVideoTime = -1;
   let smoothed: Point[] | null = null;
+  let smoothedHand: Handedness | null = null;
   const stop = () => {
     stopped = true;
     cancelAnimationFrame(raf);
@@ -41,7 +54,7 @@ export async function startRealHandTracker(
   signal?.addEventListener("abort", stop, { once: true });
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { ...(deviceId ? { deviceId } : { facingMode: "user" }), width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
     if (stopped) { stream.getTracks().forEach((t) => t.stop()); return stop; }
     video.srcObject = stream;
     await video.play().catch(() => undefined);
@@ -55,7 +68,7 @@ export async function startRealHandTracker(
     detector = await HandLandmarker.createFromOptions(files, {
       baseOptions: { modelAssetPath: MODEL, delegate: "GPU" },
       runningMode: "VIDEO",
-      numHands: 1,
+      numHands: 2,
     });
   } catch (err) {
     onModelError?.(err);
@@ -67,14 +80,22 @@ export async function startRealHandTracker(
     if (stopped) return;
     if (document.hidden) {
       smoothed = null;
-      onFrame({ timestamp: now, vector: null, landmarks: null });
+      onFrame({ timestamp: now, vector: null, landmarks: null, handedness: null });
     } else if (detector && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
       lastVideoTime = video.currentTime;
-      const raw = (detector.detectForVideo(video, now).landmarks[0] ?? null) as Point[] | null;
+      const result = detector.detectForVideo(video, now);
+      const hands: DetectedHand[] = result.landmarks.map((landmarks, i) => ({
+        landmarks: landmarks as Point[],
+        handedness: toHandedness(result.handedness[i]?.[0]?.categoryName),
+      }));
+      const chosen = arbiter.select(hands, now);
+      const raw = chosen?.landmarks ?? null;
+      // Restart smoothing when the hand changes, so the skeleton does not glide across the screen.
+      if (chosen && chosen.handedness !== smoothedHand) { smoothed = null; smoothedHand = chosen.handedness; }
       if (!raw) smoothed = null;
       else if (!smoothed) smoothed = raw.map((p) => ({ x: p.x, y: p.y }));
       else smoothed = smoothed.map((q, i) => ({ x: q.x + (raw[i].x - q.x) * SMOOTHING, y: q.y + (raw[i].y - q.y) * SMOOTHING }));
-      onFrame({ timestamp: now, vector: smoothed ? extractFeatures(smoothed) : null, landmarks: smoothed });
+      onFrame({ timestamp: now, vector: smoothed ? extractFeatures(smoothed) : null, landmarks: smoothed, handedness: chosen?.handedness ?? null });
     }
     raf = requestAnimationFrame(tick);
   };
