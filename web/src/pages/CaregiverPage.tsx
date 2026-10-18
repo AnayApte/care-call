@@ -121,7 +121,7 @@ export default function CaregiverPage() {
   }));
   return <main className="caregiver">
     <header className="cg-header"><a href="/patient" className="cg-brand">Care Call <span> / caregiver</span></a><a href="/patient">Patient screen ↗</a></header>
-    <div className="cg-heading"><div><p className="cg-eyebrow">CAREGIVER</p><h1>A little easier, together.</h1><p>Answer Maria’s requests, then review her recent practice.</p></div>
+    <div className="cg-heading"><div><p className="cg-eyebrow">CAREGIVER</p><h1>Caregiver dashboard</h1><p>View requests and recent practice.</p></div>
       <button className="cg-button cg-secondary" onClick={() => { void refresh(); }} disabled={phase === "starting"}>Refresh</button></div>
     {error && <p className="cg-message cg-error" role="alert">{error}</p>}
     {refreshError && <p className="cg-message cg-error" role="alert">Usage updates paused. Showing the last received report. {refreshError}</p>}

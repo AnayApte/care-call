@@ -30,3 +30,5 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 2026-10-18 | rey | Done: custom words implemented across web/src/cv (types.ts, personal.ts) and server (vocabulary table + POST /api/patients/{id}/vocabulary) with owners' OK; see shared/changelog/rey.md. Contract section 8/9 should list the new endpoint and label rule.
 
 2026-10-18 | josh | Josh requested live usage and the CREAO connection. Added PUT /api/patients/{id}/live-session and GET /api/patients/{id}/usage for ongoing counts; closed reports keep their retry rules. Explicit CREAO reviews read the latest saved or ongoing windows. Web/server edits are included for this request; no new libraries or automatic agent runs.
+
+2026-10-18 | josh | Josh requested plain caregiver text without Maria or the slogan. Updated the dashboard, request inbox and report labels for this request.
