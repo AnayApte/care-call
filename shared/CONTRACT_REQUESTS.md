@@ -36,3 +36,4 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 2026-10-18 | josh | Josh requested a dashboard redesign inspired by Hello from Here. Updated the caregiver layout, request history and report styling on josh/dashboard-design. This request authorizes these web edits.
 
 2026-10-18 | josh | Josh also requested matching patient fonts and buttons, with Caregiver screen at the top. Added patient styling and grouped its controls; camera and gesture logic are unchanged.
+2026-10-18 | rey | Rey asked to lower the default trigger confidence 0.8 -> 0.65 (contract-v2 s2 step 2 says 0.8): live holds kept resetting on single 3-of-5 frames, so trained moves rarely fired. Changed `server/models.py` DEFAULT_ADAPT_CONFIG and `web/src/cv/adapt.ts` fallback; clamp bounds (0.6-0.95) unchanged. Anay and Josh: please confirm, and update contract-v2 if you agree.

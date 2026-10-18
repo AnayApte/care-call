@@ -125,7 +125,7 @@ class ApprovalFlow(unittest.TestCase):
             self.assertEqual(store.get_adapt_config("p_demo")["version"], 1)
             saved = self.client.put("/api/patients/p_demo/adapt-config?expected_version=1", json=PROPOSAL)
             self.assertEqual(saved.status_code, 200)
-            self.assertEqual(saved.json()["labels"]["pain"], {"hold_frames": 9, "min_confidence": .8})
+            self.assertEqual(saved.json()["labels"]["pain"], {"hold_frames": 9, "min_confidence": .65})
             self.assertEqual(store.get_adapt_config("p_demo")["version"], 2)
 
     def test_outdated_apply_returns_409_without_overwriting(self):

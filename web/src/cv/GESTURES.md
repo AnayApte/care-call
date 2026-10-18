@@ -31,7 +31,7 @@ Training accuracy can look too high when examples come from one hold, so test fr
 
 Step 4 is connected on `josh/patient-integration`, based on Rey's onboarding branch.
 Open `/patient` for the real camera flow. Train all five movements, then repeat one.
-The ring fills over 12 matching frames at confidence 0.8 or higher, followed by an
+The ring fills over 12 matching frames at confidence 0.65 or higher, followed by an
 eight-second cooldown. Rest never sends a request.
 
 `patient.ts` connects the personal classifier to the page. The page uses the same
