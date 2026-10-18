@@ -12,7 +12,7 @@ export function Ring({ progress, mode, large, children, small }: {
 }) {
   const offset = CIRCUMFERENCE * (1 - Math.max(0, Math.min(1, progress)));
   return (
-    <div className={`ring ${mode === "countdown" ? "countdown" : ""} ${mode === "done" ? "done" : ""} ${large ? "large" : ""}`} role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+    <div className={`ring ${mode === "countdown" ? "countdown" : ""} ${mode === "done" ? "done" : ""} ${large ? "large" : ""}`} aria-label={`${Math.round(progress * 100)} percent`}>
       <svg viewBox="0 0 168 168" aria-hidden="true">
         <circle className="track" cx="84" cy="84" r="75" />
         <circle className="fill" cx="84" cy="84" r="75" style={{ strokeDashoffset: offset }} />

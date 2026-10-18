@@ -184,7 +184,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     if (!video) return;
     let stop: (() => void) | null = null;
     let cancelled = false;
-    startHandTracker(video, onFrame, () => toast("Camera blocked. Allow camera access and reload.", "error"))
+    startHandTracker(video, onFrame, (err) => {
+      const name = err instanceof Error ? err.name : "";
+      toast(name === "NotAllowedError" ? "Camera blocked. Allow camera access in the address bar and reload." : "No camera found or it is in use by another app.", "error");
+    })
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
     return () => { cancelled = true; stop?.(); };

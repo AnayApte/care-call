@@ -21,8 +21,13 @@
 
   --frame-inset: 28px;
   --frame-radius: 22px;
-  --card-w: 560px;
-  --card-h: 372px;
+  /* Shrink the deck and dock on short windows (a laptop browser is often under 700px tall). */
+  --card-w: min(560px, 42vw);
+  --card-h: min(372px, 48vh);
+  --card-top: min(96px, 10vh);
+  --card-word: min(124px, 15.5vh, 10vw);
+  --ring-size: min(168px, 21vh);
+  --dock-bottom: min(72px, 6vh);
 
   --duration-fast: 150ms;
   --duration-normal: 300ms;

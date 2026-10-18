@@ -27,7 +27,7 @@ const BASE_HAND: Point[] = [
   [0.73, 0.60], [0.73, 0.47], [0.73, 0.38], [0.72, 0.30],
   [0.78, 0.61], [0.79, 0.49], [0.80, 0.41], [0.81, 0.34],
   [0.83, 0.64], [0.86, 0.55], [0.88, 0.48], [0.89, 0.43],
-].map(([x, y]) => ({ x: 0.72 + (x - 0.72) * 0.5, y: 0.6 + (y - 0.6) * 0.5 }));
+].map(([x, y]) => ({ x: 0.3 + (x - 0.72) * 0.5, y: 0.5 + (y - 0.6) * 0.5 }));
 
 let currentGesture: Label = "neutral";
 let handHidden = false;
@@ -60,25 +60,32 @@ function syntheticFrame(timestamp: number): HandFrame {
 /** Opens the webcam into `video` and streams synthetic frames. If the camera is blocked the frames still flow, so the flow stays testable. Returns a stop function. */
 export async function startHandTracker(video: HTMLVideoElement, onFrame: (frame: HandFrame) => void, onCameraError?: (err: unknown) => void): Promise<() => void> {
   let stream: MediaStream | null = null;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 1280, height: 720 }, audio: false });
-    video.srcObject = stream;
-    await video.play();
-  } catch (err) {
-    onCameraError?.(err);
-  }
+  let stopped = false;
+  const stop = () => {
+    stopped = true;
+    cancelAnimationFrame(raf);
+    stream?.getTracks().forEach((t) => t.stop());
+    // Only detach the video if it is still showing our stream. React StrictMode mounts twice, and the
+    // first mount's cleanup must not blank the second mount's picture.
+    if (video.srcObject === stream) video.srcObject = null;
+  };
   let raf = 0;
   let last = 0;
   const loop = (now: number) => {
+    if (stopped) return;
     if (now - last >= 1000 / 30) { last = now; onFrame(syntheticFrame(now)); }
     raf = requestAnimationFrame(loop);
   };
   raf = requestAnimationFrame(loop);
-  return () => {
-    cancelAnimationFrame(raf);
-    stream?.getTracks().forEach((t) => t.stop());
-    video.srcObject = null;
-  };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    if (stopped) { stream.getTracks().forEach((t) => t.stop()); return stop; }
+    video.srcObject = stream;
+    await video.play().catch(() => undefined);
+  } catch (err) {
+    onCameraError?.(err);
+  }
+  return stop;
 }
 
 /** Same contract as Josh's training.ts: 15 real observations over a 3 s hold, fails if the hand drops. */
