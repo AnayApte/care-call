@@ -54,7 +54,7 @@ def adapt_run(body: AdaptRunIn):
     inputs = {
         "patient": patient,
         "config": store.get_adapt_config(patient["id"]),
-        "sessions": store.recent_sessions(patient["id"], 5),
+        "sessions": store.recent_usage(patient["id"], 5),
         "feedback": store.recent_feedback(patient["id"]),
     }
     try:

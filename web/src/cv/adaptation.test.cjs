@@ -60,6 +60,46 @@ test('empty reports are not uploaded', async () => {
   finally { global.fetch = original; }
 });
 
+test('live counts update the same window without closing or duplicating it', async () => {
+  const original = global.fetch, calls = [];
+  global.fetch = async (url, init) => { calls.push({ url, method: init.method, body: JSON.parse(init.body) }); return { ok: true }; };
+  try {
+    const reports = reporter();
+    await reports.publishLive(); assert.equal(calls.length, 0);
+    reports.recordAttempt(fired);
+    const id = reports.snapshot().session_id;
+    await reports.publishLive(); await reports.publishLive();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].method, 'PUT');
+    assert.match(calls[0].url, /patients\/p_demo\/live-session$/);
+    reports.recordAttempt({ ...fired, label: 'tea' });
+    await reports.publishLive();
+    assert.equal(calls[1].body.session_id, id);
+    assert.equal(calls[1].body.labels.water.attempts, 1);
+    assert.equal(calls[1].body.labels.tea.attempts, 1);
+    await reports.flush();
+    assert.equal(calls[2].method, 'POST');
+    assert.equal(calls[2].body.session_id, id);
+    assert.equal(calls[2].body.labels.water.attempts, 1);
+    assert.notEqual(reports.snapshot().session_id, id);
+  } finally { global.fetch = original; }
+});
+
+test('live upload failures retain counts and retry without blocking final reports', async () => {
+  const original = global.fetch;
+  global.fetch = async () => ({ ok: false, status: 503 });
+  try {
+    const reports = reporter(); reports.recordAttempt(fired);
+    await assert.rejects(reports.publishLive(), /503/);
+    const calls = [];
+    global.fetch = async (_, init) => { calls.push(JSON.parse(init.body)); return { ok: true }; };
+    await reports.publishLive(); await reports.flush();
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].session_id, calls[1].session_id);
+    assert.equal(calls[1].labels.water.attempts, 1);
+  } finally { global.fetch = original; }
+});
+
 test('failed reports survive a reload and retry the same immutable summary', async () => {
   const original = global.fetch, storage = memory();
   let initial;
@@ -204,9 +244,10 @@ test('reporting runs every ten minutes, closes a hold when hidden, retries onlin
   const originalFetch = global.fetch;
   const originalWindow = global.window, originalDocument = global.document;
   const win = new EventTarget(), doc = new EventTarget();
-  let interval, intervalMs, cleared = false, calls = 0;
-  win.setInterval = (fn, ms) => { interval = fn; intervalMs = ms; return 1; };
-  win.clearInterval = () => { cleared = true; };
+  const intervals = new Map(), cleared = [];
+  let calls = 0;
+  win.setInterval = (fn, ms) => { intervals.set(ms, fn); return ms; };
+  win.clearInterval = id => { cleared.push(id); };
   global.window = win; global.document = doc;
   global.fetch = async () => { calls++; return { ok: true }; };
   try {
@@ -214,17 +255,17 @@ test('reporting runs every ten minutes, closes a hold when hidden, retries onlin
     const trigger = createGestureTrigger(undefined, a => reports.recordAttempt(a));
     const stop = startSessionReporting(reports, () => trigger.reset(), () => assert.fail('unexpected failure'));
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(intervalMs, 600000);
+    assert.deepEqual([...intervals.keys()], [600000, 2000]);
     trigger.update(water, 0); trigger.update(water, 100);
     doc.hidden = true; doc.dispatchEvent(new Event('visibilitychange'));
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(calls, 1);
-    reports.recordAttempt(fired); interval();
+    reports.recordAttempt(fired); intervals.get(600000)();
     await new Promise(resolve => setImmediate(resolve)); assert.equal(calls, 2);
     reports.recordAttempt(fired); win.dispatchEvent(new Event('online'));
     await new Promise(resolve => setImmediate(resolve)); assert.equal(calls, 3);
     stop(); await new Promise(resolve => setImmediate(resolve));
-    assert.equal(cleared, true);
+    assert.deepEqual(cleared, [600000, 2000]);
     reports.recordAttempt(fired); win.dispatchEvent(new Event('pagehide'));
     await new Promise(resolve => setImmediate(resolve)); assert.equal(calls, 3);
   } finally {

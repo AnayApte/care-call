@@ -260,7 +260,44 @@ def add_session(summary: dict, synthetic: bool = False) -> dict:
                 return {"id": f"cs_{existing['n']}", **saved}
         cur = conn.execute("INSERT INTO cv_sessions (patient_id, summary, synthetic, created_at, session_id) VALUES (?,?,?,?,?)",
                            (summary["patient_id"], db.dumps(summary), int(synthetic), now_iso(), session_id))
+        if session_id:
+            conn.execute("DELETE FROM cv_live_sessions WHERE patient_id=? AND session_id=?",
+                         (summary["patient_id"], session_id))
     return {"id": f"cs_{cur.lastrowid}", **summary}
+
+
+def update_live_session(summary: dict) -> dict:
+    """Replace a running window's counts; immutable saved reports keep their retry rules."""
+    patient_id, session_id = summary["patient_id"], summary["session_id"]
+    with db.connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("SELECT 1 FROM cv_sessions WHERE patient_id=? AND session_id=?",
+                        (patient_id, session_id)).fetchone():
+            return {"saved": True}
+        row = conn.execute("SELECT summary FROM cv_live_sessions WHERE patient_id=? AND session_id=?",
+                           (patient_id, session_id)).fetchone()
+        if row and parse_iso(json.loads(row["summary"])["ended_at"]) > parse_iso(summary["ended_at"]):
+            return {"saved": False}
+        conn.execute("INSERT INTO cv_live_sessions(patient_id,session_id,summary,updated_at) VALUES (?,?,?,?)"
+                     " ON CONFLICT(patient_id,session_id) DO UPDATE SET summary=excluded.summary,updated_at=excluded.updated_at",
+                     (patient_id, session_id, db.dumps(summary), now_iso()))
+    return {"saved": False}
+
+
+def recent_usage(patient_id: str, limit: int = 5) -> list[dict]:
+    """Saved and running windows, counted once even while a final upload completes."""
+    with db.connect() as conn:
+        # One read transaction prevents a final upload between the two queries.
+        conn.execute("BEGIN")
+        saved = conn.execute("SELECT * FROM cv_sessions WHERE patient_id=?", (patient_id,)).fetchall()
+        live = conn.execute("SELECT * FROM cv_live_sessions WHERE patient_id=?", (patient_id,)).fetchall()
+    sessions = [{"id": f"cs_{r['n']}", **json.loads(r["summary"]), "live": False,
+                 "synthetic": bool(r["synthetic"])} for r in saved]
+    saved_ids = {s.get("session_id") for s in sessions}
+    sessions.extend({**json.loads(r["summary"]), "live": True, "updated_at": r["updated_at"]}
+                    for r in live if r["session_id"] not in saved_ids)
+    sessions.sort(key=lambda x: x.get("ended_at", ""), reverse=True)
+    return sessions[:limit]
 
 
 def recent_sessions(patient_id: str, limit: int = 5) -> list[dict]:

@@ -122,6 +122,49 @@ class SoftwareV2(unittest.TestCase):
         self.assertEqual(len(store.recent_sessions("p_demo")), 1)
         self.assertTrue(store.create_request_once("p_demo", "water", .9, "browser", "migrated")[1])
 
+    def test_live_counts_replace_snapshot_then_close_without_double_counting(self):
+        body = {"patient_id": "p_demo", "session_id": "running-1", "started_at": "2026-10-18T02:00:00Z",
+                "ended_at": "2026-10-18T02:01:00Z", "labels": {"water": {
+                    "attempts": 1, "fired": 1, "abandoned": 0}}, "confusions": []}
+        live_url = "/api/patients/p_demo/live-session"
+        usage_url = "/api/patients/p_demo/usage"
+        self.assertEqual(self.client.put(live_url, json=body).status_code, 200)
+        self.assertEqual(self.client.get("/api/patients/p_demo/sessions").json(), [])
+        newer = {**body, "ended_at": "2026-10-18T02:02:00Z", "labels": {"water": {
+            "attempts": 2, "fired": 1, "abandoned": 1}}}
+        self.client.put(live_url, json=newer)
+        self.client.put(live_url, json=body)  # A slow older reply cannot roll back counts.
+        usage = self.client.get(usage_url).json()
+        self.assertEqual(len(usage), 1)
+        self.assertTrue(usage[0]["live"])
+        self.assertEqual(usage[0]["labels"]["water"]["attempts"], 2)
+        self.client.post("/api/cv/sessions", json=newer)
+        self.client.put(live_url, json=body)  # A late live upload cannot reopen a closed window.
+        usage = self.client.get(usage_url).json()
+        self.assertEqual(len(usage), 1)
+        self.assertFalse(usage[0]["live"])
+        self.assertEqual(usage[0]["labels"]["water"]["attempts"], 2)
+
+    def test_live_usage_validates_patient_id_and_dates(self):
+        body = {"patient_id": "p_demo", "session_id": "running-1", "started_at": "2026-10-18T02:00:00Z",
+                "ended_at": "2026-10-18T02:01:00Z", "labels": {}, "confusions": []}
+        url = "/api/patients/p_demo/live-session"
+        for overrides in ({"patient_id": "other"}, {"session_id": None}, {"ended_at": "bad"},
+                          {"started_at": "2026-10-18T02:00:00"}):
+            self.assertEqual(self.client.put(url, json={**body, **overrides}).status_code, 422)
+
+    def test_creao_review_receives_current_usage_without_starting_automatically(self):
+        body = {"patient_id": "p_demo", "session_id": "live-for-review", "started_at": "2026-10-18T02:00:00Z",
+                "ended_at": "2026-10-18T02:01:00Z", "labels": {}, "confusions": []}
+        with patch("server.integrations.creao.start_adaptation", return_value="synthetic-run") as start, \
+             patch("server.integrations.creao.configuration_status", return_value={"ready": True}), \
+             patch.object(config, "ENABLE_CREAO", True):
+            self.client.put("/api/patients/p_demo/live-session", json=body)
+            self.client.get("/api/patients/p_demo/usage")
+            self.assertEqual(start.call_count, 0)
+            self.assertEqual(self.client.post("/api/adapt/run", json={"patient_id": "p_demo"}).status_code, 202)
+            self.assertTrue(start.call_args.kwargs["sessions"][0]["live"])
+
 
 if __name__ == "__main__":
     unittest.main()

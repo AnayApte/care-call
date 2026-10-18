@@ -39,3 +39,7 @@
 2026-10-18 | Built the 2.0 software request cycle on josh/software-v2. Added patient acknowledgement and speech, automatic listening after rest, caregiver live requests, browser beacon, optional feedback, duplicate protection and whole-label training saves. Automated checks pass; real-camera and board testing remain.
 
 2026-10-18 | Verified the local browser request/acknowledgement flow with synthetic gestures. Added camera-pause recovery, held-pose protection after retraining and a malformed-reply check. All 96 automated checks and the build pass. Real-camera, live voice/CREAO and hardware checks remain separate.
+
+2026-10-18 | Fixed the black camera preview by moving shading to a separate layer. Josh confirmed live video and hand dots on port 5181. Typecheck and build pass. Gesture accuracy and the full real-camera request cycle still need testing.
+
+2026-10-18 | Added automatic usage updates, including ongoing practice and custom words. Saved reports do not double-count the live window. Browser counts updated without Refresh. Synced Rey's new words from main. Enabled the local server's existing CREAO setup; no paid run started. 105 checks, typecheck, lint and build pass.

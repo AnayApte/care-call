@@ -6,6 +6,7 @@ export type Settings = AdaptConfig & { suggest_replace: { label: Label; reason: 
 export type Job = { id: string; base: Settings };
 export type Run = { status: "pending" | "done" | "failed"; proposal?: unknown; explanation_md?: unknown };
 export type Review = { settings: Settings; explanation: string };
+export type UsageSession = SessionSummary & { live: boolean; synthetic?: boolean; updated_at?: string };
 
 export function settingsFrom(value: unknown): Settings {
   if (!value || typeof value !== "object") throw new Error("Missing settings");
@@ -45,6 +46,8 @@ export function createAdaptationClient(apiBase: string, patientId: string) {
   return {
     setup: () => request<{ ready: boolean }>("/api/adapt/setup"),
     reports: () => request<SessionSummary[]>(`${patient}/sessions`),
+    usage: () => request<UsageSession[]>(`${patient}/usage`),
+    vocabulary: () => request<{ vocabulary: { label: string; display: string; speech: string }[] }>(patient),
     current: async () => settingsFrom(await request(`${patient}/adapt-config`)),
     start: async (): Promise<Job> => {
       const result = await request<{ job_id: string; base_config: unknown }>("/api/adapt/run", {

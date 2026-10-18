@@ -121,6 +121,19 @@ class SessionIn(BaseModel):
     false_triggers_neutral: int = Field(default=0, ge=0)
 
 
+class LiveSessionIn(SessionIn):
+    session_id: str = Field(min_length=1, max_length=100)
+
+    @field_validator("started_at", "ended_at")
+    @classmethod
+    def valid_time(cls, value):
+        from datetime import datetime
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            raise ValueError("time must include a timezone")
+        return value
+
+
 class LabelOverride(BaseModel):
     model_config = ConfigDict(extra="allow")
     min_confidence: Optional[float] = None

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import store
 from ..deps import get_patient
-from ..models import AdaptConfigIn, SampleIn, SampleBatchIn, VocabularyIn
+from ..models import AdaptConfigIn, SampleIn, SampleBatchIn, VocabularyIn, LiveSessionIn
 from ..adaptation import clean_settings
 
 router = APIRouter(prefix="/api/patients")
@@ -57,6 +57,18 @@ def get_adapt_config(p: dict = Depends(get_patient)):
 @router.get("/{patient_id}/sessions")
 def session_reports(p: dict = Depends(get_patient)):
     return store.recent_sessions(p["id"], 5)
+
+
+@router.get("/{patient_id}/usage")
+def usage_report(p: dict = Depends(get_patient)):
+    return store.recent_usage(p["id"], 5)
+
+
+@router.put("/{patient_id}/live-session")
+def live_session(body: LiveSessionIn, p: dict = Depends(get_patient)):
+    if body.patient_id != p["id"]:
+        raise HTTPException(422, "patient does not match the report")
+    return store.update_live_session(body.model_dump(exclude_none=True))
 
 
 @router.get("/{patient_id}/feedback")
