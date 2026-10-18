@@ -4,6 +4,7 @@ import { createGestureTrigger, createPersonalClassifier, createSampleCapture, st
 import { TRAINING_ORDER } from "@/lib/labels";
 import { sounds } from "@/lib/sounds";
 import { createSteadinessGate } from "@/lib/steady";
+import { spreadFrames, trimSamples } from "@/lib/samples";
 import { drawHand, type HandTone } from "@/lib/drawHand";
 
 export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "listening";
@@ -15,7 +16,9 @@ const HOLD_CAP_MS = 10000;
 const DONE_SHOW_MS = 1100;
 const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
 const TOAST_MS = 3000;
-const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
+const LISTEN_GRACE_MS = 3000;
+const MAX_HOLD_VECTORS = 30; // frames remembered from a recognition hold
+const FEEDBACK_SAMPLES = 5; // frames spread across the hold that become samples after Yes or a corrected word // after training the hand is still holding the last pose; do not fire on it
 
 export type OnboardingState = {
   phase: Phase;
@@ -31,6 +34,8 @@ export type OnboardingState = {
   result: Label | null;
   /** Leave-one-out accuracy of the personal model, once all five labels are trained. */
   accuracy: number | null;
+  /** Feedback card after a result: asking "was that right", then "what did they mean", then done. */
+  feedback: "asking" | "correcting" | "done" | null;
   toast: { text: string; kind: "info" | "error" } | null;
 };
 
@@ -45,7 +50,7 @@ function completeLabels(samples: Sample[]): Set<Label> {
 export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, countdown: 0, progress: 0, hint: "", lifting: null,
-    handPresent: false, trigger: idleTrigger, result: null, accuracy: null, toast: null,
+    handPresent: false, trigger: idleTrigger, result: null, accuracy: null, feedback: null, toast: null,
   });
 
   // Mutable session state read by the 30 fps frame loop. Kept out of React state to avoid stale closures.
@@ -63,6 +68,9 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     listenGraceUntil: 0,
     handPresent: false,
     result: null as Label | null,
+    resultRequestId: null as string | null,
+    holdVectors: [] as number[][],
+    firedVectors: [] as number[][],
     handSeenSince: null as number | null,
     countdownStartedAt: 0,
   });
@@ -165,15 +173,24 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (s.result || performance.now() < s.listenGraceUntil) { s.trigger.reset(); return; }
       const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
       const next = s.trigger.update(prediction, frame.timestamp);
+      if (next.progress > 0 && frame.vector && prediction && prediction.label === next.label) {
+        s.holdVectors = [...s.holdVectors.slice(-(MAX_HOLD_VECTORS - 1)), frame.vector.slice()];
+      } else if (next.progress === 0 && !next.fired) {
+        s.holdVectors = [];
+      }
       if (import.meta.env.DEV) (window as unknown as { __ccDebug?: unknown }).__ccDebug = { prediction, next, ready: s.classifier.isReady(), samples: s.samples.length };
       patch({ trigger: next });
       if (next.fired) {
         const fired = next.fired;
         s.result = fired.label;
+        s.resultRequestId = null;
+        s.firedVectors = s.holdVectors;
+        s.holdVectors = [];
         sounds.check();
-        patch({ result: fired.label });
+        patch({ result: fired.label, feedback: "asking" });
         void api.createRequest(fired.label, fired.confidence).then((r) => {
-          if (!r.ok) toast(`Could not send: ${r.error}`, "error");
+          if (!r.ok) { toast(`Could not send: ${r.error}`, "error"); return; }
+          s.resultRequestId = r.data.id;
         });
       }
       return;
@@ -189,7 +206,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (cancelled) return;
       const s = session.current;
       if (patientRes.ok) patch({ patient: patientRes.data });
-      if (samplesRes.ok) s.samples = samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector }));
+      if (samplesRes.ok) s.samples = trimSamples(samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector })));
       else toast("Server unreachable, training will stay on this device", "error");
       try {
         s.classifier.setSamples(s.samples);
@@ -234,9 +251,39 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     const s = session.current;
     if (!s.result) return;
     s.result = null;
+    s.resultRequestId = null;
+    s.firedVectors = [];
     s.trigger.reset();
-    patch({ result: null, trigger: idleTrigger });
+    patch({ result: null, feedback: null, trigger: idleTrigger });
   }, [patch]);
+
+  /** Tells the server how the request went and, when `label` is given, feeds a few hold frames back into the
+   * personal model under that word. "Nothing" passes no label: the server hears it was wrong, the model is untouched. */
+  const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
+    const s = session.current;
+    const vectors = spreadFrames(s.firedVectors, FEEDBACK_SAMPLES);
+    s.firedVectors = [];
+    if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
+    if (!label || vectors.length === 0) { patch({ feedback: "done" }); return; }
+    const fresh: Sample[] = vectors.map((vector) => ({ label, vector }));
+    try {
+      s.samples = trimSamples([...s.samples, ...fresh]);
+      s.classifier.setSamples(s.samples);
+    } catch {
+      toast("Could not update the model from that feedback", "error");
+      patch({ feedback: "done" });
+      return;
+    }
+    void Promise.all(fresh.map((smp) => api.postSample(smp.label, smp.vector))).then((results) => {
+      if (results.some((r) => !r.ok)) toast("Server unreachable, the correction is kept on this device", "error");
+    });
+    patch({ feedback: "done", accuracy: s.classifier.leaveOneOutAccuracy() });
+  }, [patch, toast]);
+
+  const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
+  const feedbackNo = useCallback(() => patch({ feedback: "correcting" }), [patch]);
+  /** `label` is what they actually meant. "Nothing" (null) only records the miss; it does not teach the model. */
+  const feedbackCorrect = useCallback((label: Label | null) => learnFrom(label, false), [learnFrom]);
 
   const retrain = useCallback(async () => {
     const s = session.current;
@@ -246,11 +293,14 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.index = 0;
     s.trigger.reset();
     s.result = null;
+    s.resultRequestId = null;
+    s.firedVectors = [];
+    s.holdVectors = [];
     s.handSeenSince = null;
-    setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, result: null, accuracy: null, hint: "Any movement they can repeat works." });
+    setPhase("waiting", { index: 0, lifting: null, progress: 0, trigger: idleTrigger, result: null, accuracy: null, feedback: null, hint: "Any movement they can repeat works." });
     const r = await api.deleteSamples();
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
   }, [setPhase, toast]);
 
-  return { state, start: startCountdown, retrain, dismiss };
+  return { state, start: startCountdown, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect };
 }
