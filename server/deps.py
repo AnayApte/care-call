@@ -3,7 +3,7 @@ import secrets
 
 from fastapi import Header, HTTPException
 
-from . import config
+from . import config, store
 from .models import PATIENTS
 
 
@@ -18,4 +18,4 @@ def get_patient(patient_id: str) -> dict:
     patient = PATIENTS.get(patient_id)
     if patient is None:
         raise HTTPException(404, f"unknown patient {patient_id}")
-    return patient
+    return {**patient, "vocabulary": store.vocabulary(patient_id)}

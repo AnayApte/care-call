@@ -11,9 +11,9 @@ function nearest(samples: EmbeddedSample[], query: number[], excluded = -1): Pre
     .map(sample => ({ label: sample.label, distance: distanceSquared(sample.vector, query) }))
     .sort((a, b) => a.distance - b.distance).slice(0, 5);
   if (neighbors.length < 5) return null;
-  const votes = LABELS.map(label => ({ label, count: neighbors.filter(n => n.label === label).length }))
+  const votes = [...new Set(neighbors.map(n => n.label))].map(label => ({ label, count: neighbors.filter(n => n.label === label).length }))
     .sort((a, b) => b.count - a.count);
-  if (votes[0].count === votes[1].count) return null;
+  if (votes.length > 1 && votes[0].count === votes[1].count) return null;
   return { label: votes[0].label, confidence: votes[0].count / neighbors.length };
 }
 
@@ -23,8 +23,10 @@ function nearest(samples: EmbeddedSample[], query: number[], excluded = -1): Pre
 export function createPersonalClassifier(baseline: Baseline) {
   let samples: Sample[] = [];
   let embedded: EmbeddedSample[] = [];
-  const counts = () => Object.fromEntries(LABELS.map(label => [label, samples.filter(s => s.label === label).length])) as Record<Label, number>;
-  const ready = () => LABELS.every(label => counts()[label] >= 15);
+  // Default words always count, so an empty or partial model is never ready; added words count once they have samples.
+  const labels = () => [...new Set([...LABELS, ...samples.map(s => s.label)])];
+  const counts = () => Object.fromEntries(labels().map(label => [label, samples.filter(s => s.label === label).length])) as Record<Label, number>;
+  const ready = () => { const c = counts(); return Object.values(c).every(n => n >= 15); };
   return {
     setSamples(input: readonly Sample[]) {
       // Prepare everything first so a malformed import cannot destroy a good model.

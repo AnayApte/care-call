@@ -40,7 +40,7 @@ test('fires exactly on frame 12 at the confidence boundary, then cooldown', () =
 });
 test('neutral, missing hand, low confidence, invalid confidence reset the hold', () => {
   for (const interruption of [null, { label: 'neutral', confidence: 1 }, { label: 'water', confidence: .79 },
-      { label: 'water', confidence: NaN }, { label: 'water', confidence: 2 }, { label: 'invalid', confidence: 1 }]) {
+      { label: 'water', confidence: NaN }, { label: 'water', confidence: 2 }, { label: 'Not a label!', confidence: 1 }]) {
     const engine = createGestureTrigger();
     hold(engine, water, 0, 11);
     assert.equal(engine.update(interruption, 1100).progress, 0);

@@ -68,9 +68,11 @@
 .btn-start:hover { filter: brightness(1.08); }
 .btn-start:active { transform: scale(0.97); }
 
-.btn-retrain { position: absolute; right: 60px; top: 56px; height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35);
+.live-actions { position: absolute; right: 60px; top: 56px; display: flex; gap: 10px; }
+.btn-retrain { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35);
   color: #fff; background: rgba(0, 0, 0, 0.25); font-size: 16px; cursor: pointer; backdrop-filter: blur(6px); }
 .btn-retrain:hover { background: rgba(0, 0, 0, 0.4); }
+.btn-retrain:focus-visible { outline: 2px solid var(--pine-soft); outline-offset: 2px; }
 
 .patient-caregiver-link { position: absolute; right: calc(var(--frame-inset) + 16px); bottom: calc(var(--frame-inset) + 16px); z-index: 10;
   display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border: 1px solid var(--paper-3); border-radius: 999px;
@@ -119,6 +121,14 @@
 .feedback .fb:active { transform: scale(0.96); }
 .feedback .fb.yes { background: var(--pine); border-color: var(--pine); color: #fff; }
 .feedback .fb.quiet { color: var(--mute); }
+/* Add-a-word form reuses the feedback card. */
+.feedback.add-word { display: grid; gap: 14px; min-width: 420px; }
+.feedback.add-word p { margin: 0; }
+.add-word label { display: grid; gap: 6px; font-size: 15px; color: var(--mute); }
+.add-word input { height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid rgba(27, 31, 29, 0.2); background: #fff; color: var(--ink); font: inherit; font-size: 19px; }
+.add-word input:focus-visible { outline: none; border-color: var(--pine); }
+.add-word .add-word-error { font-size: 16px; font-weight: 500; color: var(--alert); }
+.feedback .fb:disabled { opacity: 0.5; cursor: default; }
 @keyframes feedback-in {
   from { opacity: 0; transform: translate(-50%, -12px); }
   to { opacity: 1; transform: translate(-50%, 0); }

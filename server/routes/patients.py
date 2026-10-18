@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import store
 from ..deps import get_patient
-from ..models import AdaptConfigIn, SampleIn, SampleBatchIn
+from ..models import AdaptConfigIn, SampleIn, SampleBatchIn, VocabularyIn
 from ..adaptation import clean_settings
 
 router = APIRouter(prefix="/api/patients")
@@ -11,6 +11,20 @@ router = APIRouter(prefix="/api/patients")
 @router.get("/{patient_id}")
 def patient(p: dict = Depends(get_patient)):
     return p
+
+
+@router.post("/{patient_id}/vocabulary", status_code=201)
+def add_word(body: VocabularyIn, p: dict = Depends(get_patient)):
+    """Adds a request word after onboarding. Returns the updated patient."""
+    if not store.add_word(p["id"], body.label, body.display, body.speech):
+        raise HTTPException(409, f"{body.label} is already a word")
+    return {**p, "vocabulary": store.vocabulary(p["id"])}
+
+
+@router.delete("/{patient_id}/vocabulary")
+def clear_vocabulary(p: dict = Depends(get_patient)):
+    """Called on Retrain: removes added words and their recordings, keeps the defaults."""
+    return {"deleted": store.clear_vocabulary(p["id"])}
 
 
 @router.get("/{patient_id}/samples")
