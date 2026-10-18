@@ -55,3 +55,21 @@ def photon_webhook(body: InboundIn, x_bridge_secret: str = Header(default="")):
     if not photon.is_caregiver(body.from_):
         return {"reply": None}
     return {"reply": handle(body.text, body.request_id)}
+
+
+class CallAckIn(BaseModel):
+    request_id: Optional[str] = None
+
+
+@router.post("/api/webhooks/call")
+def call_ack(body: CallAckIn, x_bridge_secret: str = Header(default="")):
+    """ElevenLabs agent tool: the caregiver said on the phone that they are going. Acks with by="call"."""
+    if not config.BRIDGE_SECRET or not secrets.compare_digest(x_bridge_secret, config.BRIDGE_SECRET):
+        raise HTTPException(401, "bad or missing X-Bridge-Secret")
+    req = store.get_request(body.request_id) if body.request_id else None
+    if not req or req["status"] != "open":
+        req = store.latest_open_request()
+    if not req:
+        return {"ok": True, "message": "Nothing is open any more. Someone already answered."}
+    req = escalation.acknowledge(req["id"], "call")
+    return {"ok": True, "message": f"Marked {req['display']} as handled. Maria will hear that help is coming."}
