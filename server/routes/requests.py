@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+import sentry_sdk
 from fastapi import APIRouter, HTTPException
 
 from .. import escalation, store
@@ -16,8 +17,12 @@ def create_request(body: RequestIn):
     labels = {w["label"] for w in patient["vocabulary"]}
     if body.label not in labels:
         raise HTTPException(422, f"label must be one of {sorted(labels)} (never neutral)")
-    req = store.create_request(body.patient_id, body.label, body.confidence, body.source)
-    escalation.start(req)
+    with sentry_sdk.start_span(op="request.create", name=f"request.create {body.label}") as span:
+        req = store.create_request(body.patient_id, body.label, body.confidence, body.source)
+        span.set_data("request_id", req["id"])
+        span.set_data("source", body.source)
+        span.set_data("confidence", body.confidence)
+        escalation.start(req)
     return req
 
 

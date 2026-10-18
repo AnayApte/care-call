@@ -2,16 +2,18 @@
 import logging
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import db, escalation
+from . import db, escalation, sentry_setup
 from .routes import adapt, device, health, misc, patients, photon, requests
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s %(message)s")
+sentry_setup.init()
 
 
 @asynccontextmanager
@@ -41,6 +43,7 @@ async def validation_error(request: Request, exc: RequestValidationError):
 
 @app.exception_handler(Exception)
 async def server_error(request: Request, exc: Exception):
+    sentry_sdk.capture_exception(exc)
     return JSONResponse({"error": "internal server error"}, status_code=500)
 
 

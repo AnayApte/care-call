@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 import httpx
+import sentry_sdk
 
 from . import config
 from .models import PATIENT
@@ -35,7 +36,9 @@ def speak(text: str) -> bytes:
     text = text.strip()
     path = _cache_path(text)
     if path.exists():
+        sentry_sdk.set_tag("tts.cache", "hit")
         return path.read_bytes()
+    sentry_sdk.set_tag("tts.cache", "miss")
     if not config.ELEVENLABS_API_KEY or not config.ELEVENLABS_VOICE_ID:
         raise TtsError(503, "ElevenLabs is not configured (ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)")
     try:
