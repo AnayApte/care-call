@@ -10,11 +10,15 @@ Works:
 - Per-label limits, report versions and retraining completion have automated checks.
 - Live approved-setting updates and Help-only retraining passed in browser simulation.
 - Includes Rey's PR #18 feedback: keeps different styles and records "Nothing" without training neutral.
-- 48 JavaScript tests, five server checks, TypeScript and the web build pass.
+- Added the server CREAO adapter and caregiver report with explicit Apply and Dismiss on josh/creao-approval.
+- Refresh resumes the same review. Outdated suggestions cannot overwrite newer settings.
+- Simulated browser checks confirmed Dismiss saves nothing and Apply saves the shown settings.
+- 50 JavaScript tests, 15 server checks, TypeScript and the web build pass.
 - Earlier guided arm demo and browser beacon preview remain available.
 
 Next:
-- Review Step 5 with Rey and connect his live CREAO agent and approval screen.
+- Finish CREAO email verification, create the agent and set its key privately. No live run verified yet.
+- Review the CREAO changes after Step 5 PR #15. Setup: docs/josh-creao.md.
 - Test real camera movements together.
 - Alex: test the caregiver Pi against the same server, including its buzzer and display.
 - Anay: update the shared plan for Josh's new goal and agree a richer observation format.

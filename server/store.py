@@ -243,8 +243,13 @@ def get_adapt_config(patient_id: str) -> dict:
     return json.loads(row["config"]) if row else dict(DEFAULT_ADAPT_CONFIG)
 
 
-def set_adapt_config(patient_id: str, config_value: dict) -> dict:
+def set_adapt_config(patient_id: str, config_value: dict, expected_version: int | None = None) -> dict:
     with db.connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT config FROM adapt_configs WHERE patient_id=?", (patient_id,)).fetchone()
+        current = json.loads(row["config"]) if row else DEFAULT_ADAPT_CONFIG
+        if expected_version is not None and (current["version"] != expected_version or config_value["version"] != expected_version + 1):
+            raise ValueError("Stale adjustment")
         conn.execute("INSERT INTO adapt_configs (patient_id, config, updated_at) VALUES (?,?,?)"
                      " ON CONFLICT(patient_id) DO UPDATE SET config=excluded.config, updated_at=excluded.updated_at",
                      (patient_id, db.dumps(config_value), now_iso()))

@@ -21,3 +21,5 @@
 2026-10-17 | Connected Step 5 reports, approved settings and selective retraining. Reports retry after failure; settings stay bounded and wait for a hold to finish. Selective retraining kept the other movements intact. Live CREAO setup remains Rey's part.
 
 2026-10-17 | Resolved Step 5 conflicts with main. Kept Rey's gentler feedback and different movement styles. "Nothing" enters reports without teaching neutral.
+
+2026-10-17 | Josh asked to finish the CREAO connection and Apply screen. Added the server adapter, recent reports, review comparison and explicit approval. Dismiss leaves settings alone; stale Apply is rejected. 50 JavaScript and 15 server checks pass, plus build and typecheck. Browser flow passed with a labeled simulation. Live CREAO agent and key still need setup.
