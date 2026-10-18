@@ -18,7 +18,7 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 async function call<T>(path: string, init?: RequestInit): Promise<Result<T>> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
-      ...init,
+      signal: AbortSignal.timeout(8000), ...init,
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     });
     if (!res.ok) {
@@ -41,8 +41,8 @@ export const api = {
     call<StoredSample>(`/api/patients/${PATIENT_ID}/samples`, { method: "POST", body: JSON.stringify({ label, vector }) }),
   deleteSamples: () => call<unknown>(`/api/patients/${PATIENT_ID}/samples`, { method: "DELETE" }),
   /** Contract section 19: the caregiver or patient side marks a request right or wrong. */
-  postFeedback: (requestId: string, correct: boolean) =>
-    call<unknown>(`/api/requests/${requestId}/feedback`, { method: "POST", body: JSON.stringify({ correct }) }),
+  postFeedback: (requestId: string, correct: boolean, intendedLabel?: string) =>
+    call<unknown>(`/api/requests/${requestId}/feedback`, { method: "POST", body: JSON.stringify({ correct, intended_label: intendedLabel }) }),
   createRequest: (label: string, confidence: number) =>
     call<CareRequest>(`/api/requests`, {
       method: "POST",

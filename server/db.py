@@ -74,6 +74,16 @@ def connect():
 def init() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Additive migrations: keep existing requests, recordings and reports.
+        for table, column in (("requests", "client_request_id"), ("cv_sessions", "session_id"),
+                              ("feedback", "intended_label")):
+            columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if column not in columns:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS request_retry_key "
+                     "ON requests(patient_id, client_request_id) WHERE client_request_id IS NOT NULL")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS session_retry_key "
+                     "ON cv_sessions(patient_id, session_id) WHERE session_id IS NOT NULL")
 
 
 def dumps(value) -> str:

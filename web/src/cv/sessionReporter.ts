@@ -22,6 +22,8 @@ export function createSessionReporter(apiBase: string, patientId: string, option
     if (Array.isArray(saved)) pending = saved.filter((x): x is SessionSummary =>
       x && x.patient_id === patientId && typeof x.started_at === "string" && typeof x.ended_at === "string" &&
       x.labels && Array.isArray(x.confusions) && Number.isInteger(x.config_version));
+    // Give pre-v2 queued reports one stable key before their first retry.
+    pending.forEach(summary => { summary.session_id ??= crypto.randomUUID(); });
   } catch { options.onStorageError?.(); }
   const persist = () => {
     try {

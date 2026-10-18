@@ -15,16 +15,21 @@ export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraId, setCameraId] = useState(loadCameraId);
-  const { state, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect } = useOnboarding(videoRef, canvasRef, cameraId);
-  const { phase, index, order, progress, hint, lifting, trigger, result, delivery, feedback, toast } = state;
+  const { state, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect, feedbackSkip, retryRequest, enableSound, saveTraining, checkRequest } = useOnboarding(videoRef, canvasRef, cameraId);
+  const { phase, index, order, progress, hint, lifting, trigger, result, flow, feedback, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.code === "Space" && result) { e.preventDefault(); dismiss(); } };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [result, dismiss]);
+  const delivered = flow.phase === "waiting_ack" || flow.phase === "acknowledged" || !!flow.request;
+  const answered = flow.request?.status === "acked";
+  const status = result ? flow.phase === "sending" ? "Sending request…"
+    : flow.phase === "delivery_unknown" ? "Delivery is unconfirmed. Retry the same request below."
+    : flow.phase === "failed" ? "Request rejected. Check the message below."
+    : flow.phase === "acknowledged" ? "Help is coming."
+    : flow.phase === "waiting_release" ? "Relax your hand. Listening will resume automatically."
+    : "Request sent. Waiting for a caregiver."
+    : flow.phase === "waiting_release" ? "Show your relaxed movement for a moment to begin."
+    : deciding ? "Keep holding while the ring fills." : "Watching for a movement.";
 
   // Browsers only allow sound after a user gesture. Any tap or key on the page unlocks the cues.
   useEffect(() => {
@@ -35,12 +40,23 @@ export default function PatientPage() {
   }, []);
 
   return (
-    <main className="relative h-full overflow-hidden" onClick={result ? dismiss : undefined}>
+    <main className="relative h-full overflow-hidden">
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
         <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
         <HandCanvas ref={canvasRef} />
       </div>
       {!USE_MOCK_HAND && <CameraSelect value={cameraId} onChange={setCameraId} />}
+      <div className="patient-tools">
+        <button type="button" onClick={() => { void enableSound(); }}>{state.voice === "off" || state.voice === "blocked" ? "Enable sound" : "Enable sound again"}</button>
+        <span role="status">{state.voice === "off" ? "Sound is off" : state.voice === "browser" ? "Browser voice fallback" : state.voice === "blocked" ? "Sound blocked — tap Enable sound" : state.voice === "elevenlabs" ? "ElevenLabs audio" : "Sound ready"}</span>
+        {state.savingTraining && <button type="button" onClick={() => { void saveTraining(); }}>Retry training save</button>}
+      </div>
+      {state.cameraError && <div className="patient-warning" role="alert">{state.cameraError} <button type="button" onClick={() => window.location.reload()}>Reload camera</button></div>}
+      {flow.error && <div className="patient-warning delivery-warning" role="alert">{flow.error}
+        {(flow.phase === "delivery_unknown" || flow.phase === "failed") && <button type="button" onClick={() => { void retryRequest(); }}>Retry same request</button>}
+        {flow.phase === "waiting_ack" && <button type="button" onClick={() => { void checkRequest(); }}>Check for help</button>}
+        {flow.phase === "failed" && <button type="button" onClick={dismiss}>Return to listening</button>}
+      </div>}
 
       {onboarding && (
         <>
@@ -79,23 +95,21 @@ export default function PatientPage() {
         <>
           <button type="button" className="btn-retrain" onClick={(e) => { e.stopPropagation(); void retrain(); }}>Retrain movements</button>
           <h2 className={`live-word ${result ? "result" : ""}`}>{result ? DISPLAY_WORD[result] : deciding ? "Hold it" : "Ready"}</h2>
-          <p className="live-sub">{result ? delivery === "sent"
-            ? "Request sent. Waiting for a caregiver. Tap the screen or press space to continue."
-            : delivery === "failed" ? "Request status unavailable. Tap the screen or press space to continue."
-            : "Sending request…" : deciding ? "Keep holding while the ring fills." : "Watching for a movement."}</p>
+          <p className="live-sub" role="status" aria-live="polite">{status}</p>
           <div className="live-ring">
-            <Ring progress={result ? 1 : trigger.progress} mode={delivery === "sent" ? "done" : "hold"} large small>
-              {delivery === "sent" ? <CheckMark /> : delivery === "sending" ? "Sending" : delivery === "failed" ? "Check" : ""}
+            <Ring progress={result ? 1 : trigger.progress} mode={answered ? "done" : "hold"} large small>
+              {answered ? <CheckMark /> : flow.phase === "sending" ? "Sending" : delivered ? "Sent" : flow.phase === "delivery_unknown" || flow.phase === "failed" ? "Check" : flow.phase === "waiting_release" ? "Relax" : ""}
             </Ring>
           </div>
-          {result && feedback && feedback !== "done" && (
+          {result && flow.request && feedback && feedback !== "done" && (
             <div className="feedback" onClick={(e) => e.stopPropagation()} role="group" aria-label="Was that right">
               {feedback === "asking" ? (
                 <>
-                  <p>Caregiver check: was that right?</p>
+                  <p>Optional caregiver check</p>
                   <div className="row">
-                    <button type="button" className="fb yes" onClick={feedbackYes}>Yes</button>
-                    <button type="button" className="fb" onClick={feedbackNo}>No</button>
+                    <button type="button" className="fb yes" onClick={feedbackYes}>Correct</button>
+                    <button type="button" className="fb" onClick={feedbackNo}>Incorrect</button>
+                    <button type="button" className="fb quiet" onClick={feedbackSkip}>Not sure</button>
                   </div>
                 </>
               ) : (
@@ -111,7 +125,7 @@ export default function PatientPage() {
               )}
             </div>
           )}
-          {result && feedback === "done" && <div className="feedback thanks"><p>Thanks. Tap or press space to continue.</p></div>}
+          {result && feedback === "done" && <div className="feedback thanks"><p>Thanks. Help and listening do not depend on this check.</p></div>}
           <p className="notice">{state.accuracy !== null && <>Training check: {Math.round(state.accuracy * 100)}% (leave-one-out).<br /></>}Assistive prototype, not a medical device.</p>
         </>
       )}
@@ -119,7 +133,7 @@ export default function PatientPage() {
       {phase === "loading" && <div className="toast">Starting camera</div>}
       {USE_MOCK_HAND && <p className="toast" style={{ top: "auto", bottom: 56 }}>Simulation: 0 rest, 1 water, 2 pain, 3 help, 4 bathroom, X hide</p>}
       {toast && <div className={`toast ${toast.kind === "error" ? "error" : ""}`} role="status">{toast.text}</div>}
-      <a className="patient-caregiver-link" href="/caregiver" onClick={(e) => e.stopPropagation()}>Caregiver reports <span aria-hidden="true">↗</span></a>
+      <a className="patient-caregiver-link" href="/caregiver" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>Caregiver screen <span aria-hidden="true">↗</span></a>
     </main>
   );
 }

@@ -62,14 +62,13 @@ def _place_call(request_id: str) -> None:
 def acknowledge(request_id: str, by: str) -> Optional[dict]:
     """Ack from any channel. If the caregiver was already texted, tell them it is handled."""
     with sentry_sdk.start_span(op="request.ack", name=f"request.ack {by}") as span:
-        before = store.get_request(request_id)
-        req = store.ack_request(request_id, by)
-        if before and req and before["status"] == "open":
+        req, changed = store.ack_request_once(request_id, by)
+        if changed and req:
             span.set_tag("acked_by", by)
             span.set_tag("latency_ms", req["ack_latency_ms"])
             sentry_sdk.set_tag("latency_ms", req["ack_latency_ms"])
             log.info("request.ack %s by %s after %s ms", request_id, by, req["ack_latency_ms"])
-    if before and req and before["status"] == "open" and req["escalation_level"] >= 1 and by != "imessage":
+    if changed and req and config.ENABLE_PHOTON and req["escalation_level"] >= 1 and by != "imessage":
         seconds = round((req["ack_latency_ms"] or 0) / 1000)
         text = f"Update: {req['display']} was answered ({by}) after {seconds} s. No need to come."
         threading.Thread(target=photon.send_message, args=(text,), daemon=True).start()
@@ -85,9 +84,9 @@ def _after(seconds: float, fn, request_id: str) -> None:
 def start(req: dict) -> None:
     """Schedule the remaining escalation steps for an open request."""
     age = (datetime.now(timezone.utc) - store.parse_iso(req["created_at"])).total_seconds()
-    if req["escalation_level"] < 1:
+    if config.ENABLE_PHOTON and req["escalation_level"] < 1:
         _after(config.ESCALATE_MESSAGE_AFTER_S - age, _send_message, req["id"])
-    if req["escalation_level"] < 2:
+    if config.ENABLE_PHONE_CALL and req["escalation_level"] < 2:
         _after(config.ESCALATE_CALL_AFTER_S - age, _place_call, req["id"])
 
 

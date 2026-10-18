@@ -60,6 +60,8 @@ export async function startRealHandTracker(
     await video.play().catch(() => undefined);
   } catch (err) {
     onCameraError?.(err);
+    stop();
+    return stop;
   }
 
   try {

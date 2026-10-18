@@ -41,7 +41,10 @@ def _creao():
 @router.post("/api/cv/sessions", status_code=201)
 def store_session(body: SessionIn):
     get_patient(body.patient_id)
-    return store.add_session(body.model_dump())
+    try:
+        return store.add_session(body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 @router.post("/api/adapt/run", status_code=202)

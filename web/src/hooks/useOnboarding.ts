@@ -6,11 +6,15 @@ import { loadHandedness, saveHandedness } from "@/lib/handednessPref";
 import { TRAINING_ORDER } from "@/lib/labels";
 import { sounds } from "@/lib/sounds";
 import { createSteadinessGate } from "@/lib/steady";
-import { spreadFrames, trimSamples } from "@/lib/samples";
+import { trimSamples } from "@/lib/samples";
 import { drawHand, type HandTone } from "@/lib/drawHand";
 import { loadApprovedConfig, sanitizeAdaptConfig, type AdaptConfig } from "@/cv/adapt";
 import { browserStore, createSessionReporter, startSessionReporting } from "@/cv/sessionReporter";
 import { createRetrainingPlan, replaceLabelSamples } from "@/cv/retraining";
+import { createRequestFlow, type DeliveryState } from "@/cv/requestFlow";
+import { createSampleQueue } from "@/cv/sampleQueue";
+import { createRequestsClient } from "@/lib/requests";
+import { createPatientSpeech, type VoiceState } from "@/lib/patientSpeech";
 
 export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "listening";
 
@@ -21,8 +25,6 @@ const DONE_SHOW_MS = 1100;
 const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
 const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
-const MAX_HOLD_VECTORS = 30; // frames remembered from a recognition hold
-const FEEDBACK_SAMPLES = 5; // examples spread across a confirmed or corrected hold
 
 export type OnboardingState = {
   phase: Phase;
@@ -35,9 +37,12 @@ export type OnboardingState = {
   lifting: Label | null;
   handPresent: boolean;
   trigger: TriggerState;
-  /** Recognised word, shown until the caregiver dismisses it with a tap or the spacebar. */
+  /** The current request stays visible until acknowledgement and a fresh release. */
   result: Label | null;
-  delivery: "sending" | "sent" | "failed" | null;
+  flow: DeliveryState;
+  voice: VoiceState;
+  cameraError: string;
+  savingTraining: boolean;
   feedback: "asking" | "correcting" | "done" | null;
   /** Leave-one-out accuracy of the personal model, once all five labels are trained. */
   accuracy: number | null;
@@ -49,7 +54,8 @@ const idleTrigger: TriggerState = { label: null, progress: 0, cooldownMs: 0, fir
 export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>, cameraId?: string) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, order: TRAINING_ORDER, countdown: 0, progress: 0, hint: "", lifting: null,
-    handPresent: false, trigger: idleTrigger, result: null, delivery: null, feedback: null, accuracy: null, toast: null,
+    handPresent: false, trigger: idleTrigger, result: null, feedback: null, accuracy: null, toast: null,
+    flow: { phase: "waiting_release", request: null, input: null, error: "", online: true }, voice: "off", cameraError: "", savingTraining: false,
   });
 
   const reportsRef = useRef<ReturnType<typeof createSessionReporter> | null>(null);
@@ -78,15 +84,13 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     listenGraceUntil: 0,
     handPresent: false,
     result: null as Label | null,
-    requestSerial: 0,
     resultRequestId: null as string | null,
-    pendingFeedback: null as boolean | null,
     feedbackAnswered: false,
-    holdVectors: [] as number[][],
-    firedVectors: [] as number[][],
     handSeenSince: null as number | null,
     countdownStartedAt: 0,
     lastPredictionAt: -Infinity,
+    lastFrameAt: -Infinity,
+    cameraStalled: false,
   });
 
   const patch = useCallback((p: Partial<OnboardingState>) => setState((s) => ({ ...s, ...p })), []);
@@ -103,6 +107,43 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     later(() => patch({ toast: null }), TOAST_MS);
   }, [patch, later]);
 
+  const speechRef = useRef<ReturnType<typeof createPatientSpeech> | null>(null);
+  if (!speechRef.current) speechRef.current = createPatientSpeech(API_BASE, voice => patch({ voice }));
+  const speech = speechRef.current;
+  const flowRef = useRef<ReturnType<typeof createRequestFlow> | null>(null);
+  if (!flowRef.current) flowRef.current = createRequestFlow(createRequestsClient(API_BASE, PATIENT_ID),
+    `carecall:active-request:${API_BASE}:${PATIENT_ID}`, { storage: browserStore(), speak: text => speech.say(text) });
+  const flow = flowRef.current;
+  const sampleQueueRef = useRef<ReturnType<typeof createSampleQueue> | null>(null);
+  if (!sampleQueueRef.current) sampleQueueRef.current = createSampleQueue(API_BASE, PATIENT_ID, browserStore(),
+    (label, key) => session.current.retraining.complete(label, true, key));
+  const sampleQueue = sampleQueueRef.current;
+  const saveTraining = useCallback(async () => {
+    patch({ savingTraining: true });
+    try { await sampleQueue.flush(); }
+    catch { toast("Training save failed. The recording is kept here; retry saving.", "error"); }
+    finally { patch({ savingTraining: sampleQueue.pendingCount() > 0 }); }
+  }, [sampleQueue, patch, toast]);
+
+  useEffect(() => flow.subscribe(next => {
+    const s = session.current;
+    s.result = next.input?.label as Label ?? null;
+    s.resultRequestId = next.request?.id ?? null;
+    patch({ flow: next, result: s.result, ...(!next.input ? { feedback: null } : {}) });
+  }), [flow, patch]);
+  useEffect(() => {
+    const poll = () => { void flow.poll(); };
+    poll();
+    const timer = window.setInterval(poll, 1000);
+    window.addEventListener("online", poll);
+    return () => { window.clearInterval(timer); window.removeEventListener("online", poll); };
+  }, [flow]);
+  useEffect(() => {
+    const retry = () => { void saveTraining(); };
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [saveTraining]);
+
   const applyConfig = useCallback((config: AdaptConfig) => {
     const s = session.current;
     // Close the old hold before rotating reports to the new settings version.
@@ -110,7 +151,6 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     reports.setConfigVersion(config.version);
     s.trigger.setConfig(config);
     s.triggerState = idleTrigger;
-    s.holdVectors = [];
     s.lastPredictionAt = -Infinity;
     s.config = config;
     s.pendingConfig = null;
@@ -150,16 +190,14 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     voteHand();
     sounds.check();
     setPhase("done", { progress: 1, lifting: null, hint: s.index + 1 < s.order.length ? `Next: ${s.order[s.index + 1]}.` : "Movements ready." });
-    const trainingPlan = s.retraining;
-    const trainingKey = trainingPlan.key();
-    void Promise.all(samples.map((smp) => api.postSample(smp.label, smp.vector))).then((results) => {
-      if (results.some((r) => !r.ok)) toast("Server unreachable, training kept on this device", "error");
-      else trainingPlan.complete(label, true, trainingKey);
-    });
+    sampleQueue.enqueue(label, samples.map(sample => sample.vector), s.retraining.key());
+    if (!sampleQueue.storageOk()) toast("Browser storage is unavailable. Keep this page open until training is saved.", "error");
+    void saveTraining();
     later(() => {
       if (s.index + 1 >= s.order.length) {
         s.classifier.setSamples(s.samples);
         s.trigger.reset();
+        flow.interrupt();
         s.listenGraceUntil = performance.now() + LISTEN_GRACE_MS;
         setPhase("listening", { lifting: label, progress: 0, trigger: idleTrigger, accuracy: s.classifier.leaveOneOutAccuracy() });
         return;
@@ -168,10 +206,13 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       s.handSeenSince = null;
       setPhase("waiting", { index: s.index, lifting: label, progress: 0, hint: "Any movement they can repeat works." });
     }, DONE_SHOW_MS);
-  }, [setPhase, later, toast, voteHand]);
+  }, [setPhase, later, voteHand, sampleQueue, saveTraining, toast, flow]);
 
   const onFrame = useCallback((frame: TrackedFrame) => {
     const s = session.current;
+    s.lastFrameAt = performance.now();
+    if (s.cameraStalled) { s.cameraStalled = false; patch({ cameraError: "" }); }
+    if (document.hidden) { s.capture = null; s.trigger.reset(); flow.interrupt(); return; }
     const present = frame.vector !== null;
     if (present) s.holdHandedness = frame.handedness;
     const tone: HandTone = s.phase === "holding" || s.phase === "listening" ? "live" : "faint";
@@ -212,7 +253,15 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       return;
     }
     if (s.phase === "listening") {
-      if (s.result) { s.trigger.reset(); return; }
+      if (frame.vector && frame.timestamp - s.lastPredictionAt < 1000 / 12) return;
+      s.lastPredictionAt = frame.timestamp;
+      const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
+      flow.observe(prediction, frame.timestamp);
+      if (flow.snapshot().phase !== "ready") {
+        s.trigger.reset(); s.triggerState = idleTrigger;
+        patch({ trigger: idleTrigger });
+        return;
+      }
       // Approved updates wait for the current hold to finish; the engine keeps its cooldown.
       if (s.pendingConfig && s.triggerState.progress === 0) {
         applyConfig(s.pendingConfig);
@@ -220,7 +269,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         if (order.length) {
           s.order = order; s.index = 0;
           s.handSeenSince = null;
-          setPhase("waiting", { order, index: 0, progress: 0, lifting: null, trigger: idleTrigger, result: null, delivery: null,
+          setPhase("waiting", { order, index: 0, progress: 0, lifting: null, trigger: idleTrigger, result: null,
             hint: "Your caregiver asked you to record these movements again." });
           return;
         }
@@ -228,45 +277,20 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       }
       if (performance.now() < s.listenGraceUntil) { s.trigger.reset(); return; }
       // Keep the contract's 12 observations about one second while the overlay stays smooth.
-      if (frame.vector && frame.timestamp - s.lastPredictionAt < 1000 / 12) return;
-      s.lastPredictionAt = frame.timestamp;
-      const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
-      const previous = s.triggerState;
       const next = s.trigger.update(prediction, frame.timestamp);
-      if (next.label !== previous.label || (!next.fired && next.progress <= previous.progress)) s.holdVectors = [];
-      if ((next.progress > 0 || next.fired) && frame.vector && prediction && prediction.label === next.label) {
-        s.holdVectors = [...s.holdVectors.slice(-(MAX_HOLD_VECTORS - 1)), frame.vector.slice()];
-      } else if (next.progress === 0 && !next.fired) s.holdVectors = [];
       s.triggerState = next;
       if (import.meta.env.DEV) (window as unknown as { __ccDebug?: unknown }).__ccDebug = { prediction, next, ready: s.classifier.isReady(), samples: s.samples.length };
       patch({ trigger: next });
       if (next.fired) {
         const fired = next.fired;
-        s.result = fired.label;
-        s.resultRequestId = null;
-        s.pendingFeedback = null;
         s.feedbackAnswered = false;
-        s.firedVectors = s.holdVectors;
-        s.holdVectors = [];
-        const serial = ++s.requestSerial;
         sounds.check();
-        patch({ result: fired.label, delivery: "sending", feedback: "asking" });
-        void api.createRequest(fired.label, fired.confidence).then((r) => {
-          if (serial !== s.requestSerial) return;
-          patch({ delivery: r.ok ? "sent" : "failed" });
-          if (!r.ok) toast(`Could not send: ${r.error}`, "error");
-          else {
-            s.resultRequestId = r.data.id;
-            if (s.pendingFeedback !== null) {
-              void api.postFeedback(r.data.id, s.pendingFeedback);
-              s.pendingFeedback = null;
-            }
-          }
-        });
+        patch({ feedback: "asking" });
+        void flow.fire(fired.label, fired.confidence);
       }
       return;
     }
-  }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef, applyConfig, setPhase]);
+  }, [patch, toast, startCountdown, finishLabel, canvasRef, videoRef, applyConfig, setPhase, flow]);
 
   // Load patient and samples, then pick the starting point.
   useEffect(() => {
@@ -278,9 +302,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (cancelled) return;
       const s = session.current;
       if (patientRes.ok) patch({ patient: patientRes.data });
-      if (samplesRes.ok) s.samples = trimSamples(samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector })));
-      else toast("Server unreachable, training will stay on this device", "error");
+      s.samples = trimSamples(sampleQueue.load(samplesRes.ok ? samplesRes.data.map(x => ({ label: x.label as Label, vector: x.vector })) : undefined));
+      if (!samplesRes.ok) toast("Server unreachable. Using recordings saved on this computer.", "error");
       applyConfig(approved ?? s.config);
+      for (const batch of sampleQueue.pendingLabels()) s.retraining.complete(batch.label, false, batch.trainingKey);
       if (!approved) toast("Could not load movement settings. Keeping the current settings.", "error");
       try {
         s.classifier.setSamples(s.samples);
@@ -290,6 +315,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
         toast("Saved training could not load. Please retrain movements.", "error");
       }
       const order = s.retraining.order(s.samples, TRAINING_ORDER);
+      void saveTraining();
       if (order.length === 0) {
         setPhase("listening", { accuracy: s.classifier.leaveOneOutAccuracy() });
       } else {
@@ -299,7 +325,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       }
     })();
     return () => { cancelled = true; };
-  }, [patch, setPhase, toast, applyConfig]);
+  }, [patch, setPhase, toast, applyConfig, sampleQueue, saveTraining]);
 
   useEffect(() => {
     let stopped = false;
@@ -330,59 +356,62 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     let cancelled = false;
     const controller = new AbortController();
     const { trigger, arbiter } = session.current;
+    patch({ cameraError: "" });
+    flow.interrupt();
     startHandTracker(video, onFrame, (err) => {
       const name = err instanceof Error ? err.name : "";
-      toast(name === "NotAllowedError" ? "Camera blocked. Allow camera access in the address bar and reload." : "No camera found or it is in use by another app.", "error");
-    }, () => toast("Hand model failed to load. Check the network and reload.", "error"), controller.signal, cameraId, arbiter)
+      patch({ cameraError: name === "NotAllowedError" ? "Camera blocked. Allow access, then reload the camera." : "No camera found or it is being used by another app." });
+      flow.interrupt();
+    }, () => patch({ cameraError: "Hand model could not load. Check the connection, then reload the camera." }), controller.signal, cameraId, arbiter)
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
     return () => { cancelled = true; controller.abort(); stop?.(); trigger.reset(); };
-  }, [videoRef, onFrame, toast, cameraId]);
+  }, [videoRef, onFrame, toast, cameraId, patch, flow]);
 
   useEffect(() => () => { session.current.timers.forEach((id) => window.clearTimeout(id)); }, []);
 
-  /** Clears the shown result and goes back to watching. Bound to a tap on the screen and the spacebar. */
-  const dismiss = useCallback(() => {
-    const s = session.current;
-    if (!s.result) return;
-    s.result = null;
-    s.requestSerial++;
-    s.resultRequestId = null;
-    s.pendingFeedback = null;
-    s.firedVectors = [];
-    s.holdVectors = [];
-    s.trigger.reset();
-    s.triggerState = idleTrigger;
-    s.lastPredictionAt = -Infinity;
-    patch({ result: null, delivery: null, feedback: null, trigger: idleTrigger });
-  }, [patch]);
+  useEffect(() => {
+    const pause = () => {
+      const s = session.current;
+      s.trigger.reset(); s.triggerState = idleTrigger; s.capture = null; s.gate.reset();
+      flow.interrupt();
+      patch({ trigger: idleTrigger });
+      if (s.phase === "countdown" || s.phase === "holding") {
+        s.timers.forEach(id => window.clearTimeout(id));
+        setPhase("waiting", { progress: 0, hint: "Bring your hand back to record again." });
+      }
+    };
+    const visibility = () => { if (document.hidden) pause(); };
+    const watchdog = window.setInterval(() => {
+      const s = session.current;
+      if (performance.now() - s.lastFrameAt > 700) {
+        pause();
+        if (Number.isFinite(s.lastFrameAt) && !s.cameraStalled && !document.hidden) {
+          s.cameraStalled = true;
+          patch({ cameraError: "The camera has paused. Check the camera or reload it." });
+        }
+      }
+    }, 500);
+    document.addEventListener("visibilitychange", visibility);
+    return () => { window.clearInterval(watchdog); document.removeEventListener("visibilitychange", visibility); };
+  }, [flow, patch, setPhase]);
+  useEffect(() => () => speech.stop(), [speech]);
+  const dismiss = useCallback(() => flow.recoverFailed(), [flow]);
 
-  /** Keep Rey's feedback learning. "Nothing" is reported as a false trigger without teaching neutral. */
+  /** Save an explicit correctness vote. Guided recording changes personal samples. */
   const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
     const s = session.current;
-    if (!s.result || s.feedbackAnswered) return;
+    if (!s.result || !s.resultRequestId || s.feedbackAnswered) return;
     s.feedbackAnswered = true;
-    reports.recordFeedback(label ?? "neutral", s.result);
-    const vectors = spreadFrames(s.firedVectors, FEEDBACK_SAMPLES);
-    s.firedVectors = [];
-    if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
-    else s.pendingFeedback = wasCorrect;
-    if (wasCorrect && !s.arbiter.lock()) voteHand();
-    if (!label || vectors.length === 0) { patch({ feedback: "done" }); return; }
-    const fresh: Sample[] = vectors.map(vector => ({ label, vector }));
-    try {
-      const nextSamples = trimSamples([...s.samples, ...fresh]);
-      s.classifier.setSamples(nextSamples);
-      s.samples = nextSamples;
-    } catch {
-      toast("Could not update the model from that feedback", "error");
-      patch({ feedback: "done" });
-      return;
-    }
-    void Promise.all(fresh.map(smp => api.postSample(smp.label, smp.vector))).then(results => {
-      if (results.some(r => !r.ok)) toast("Server unreachable, the correction is kept on this device", "error");
+    const predicted = s.result;
+    const requestId = s.resultRequestId;
+    if (requestId) void api.postFeedback(requestId, wasCorrect, label ?? "neutral").then(r => {
+      if (s.resultRequestId !== requestId) return;
+      if (!r.ok) { s.feedbackAnswered = false; patch({ feedback: "asking" }); toast("Feedback was not saved. Please retry.", "error"); }
+      else reports.recordFeedback(label ?? "neutral", predicted);
     });
-    patch({ feedback: "done", accuracy: s.classifier.leaveOneOutAccuracy() });
+    if (wasCorrect && !s.arbiter.lock()) voteHand();
+    patch({ feedback: "done" });
   }, [patch, reports, toast, voteHand]);
   const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
   const feedbackNo = useCallback(() => patch({ feedback: "correcting" }), [patch]);
@@ -392,28 +421,28 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   const retrain = useCallback(async () => {
     const s = session.current;
     s.timers.forEach((id) => window.clearTimeout(id));
-    s.samples = [];
-    s.classifier.setSamples([]);
+    if (flow.snapshot().input) { toast("Wait for the current request to finish before retraining."); return; }
     s.index = 0;
     s.order = TRAINING_ORDER.slice();
     s.retraining.reset();
     s.trigger.reset();
     s.result = null;
-    s.requestSerial++;
     s.resultRequestId = null;
-    s.pendingFeedback = null;
-    s.firedVectors = [];
-    s.holdVectors = [];
     s.handSeenSince = null;
     s.arbiter.reset();
     s.holdHandedness = null;
     saveHandedness(null);
     s.lastPredictionAt = -Infinity;
     s.triggerState = idleTrigger;
-    setPhase("waiting", { index: 0, order: s.order, lifting: null, progress: 0, trigger: idleTrigger, result: null, delivery: null, feedback: null, accuracy: null, hint: "Any movement they can repeat works." });
-    const r = await api.deleteSamples();
-    if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
-  }, [setPhase, toast]);
+    setPhase("waiting", { index: 0, order: s.order, lifting: null, progress: 0, trigger: idleTrigger, result: null, feedback: null, accuracy: null, hint: "Any movement they can repeat works." });
+    flow.interrupt();
+  }, [setPhase, toast, flow]);
 
-  return { state, start: startCountdown, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect };
+  return { state, start: startCountdown, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect,
+    feedbackSkip: () => patch({ feedback: "done" }), retryRequest: flow.retry, checkRequest: flow.poll,
+    enableSound: async () => {
+      await speech.enable();
+      const current = flow.snapshot();
+      if (current.request) speech.say(current.request.status === "acked" ? "Help is coming." : current.request.speech);
+    }, saveTraining };
 }

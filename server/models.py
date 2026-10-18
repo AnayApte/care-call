@@ -1,7 +1,8 @@
 """Wire shapes from contract section 8 and request bodies from section 9."""
 from typing import Literal, Optional
+import math
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PATIENT = {
     "id": "p_demo",
@@ -32,12 +33,32 @@ class SampleIn(BaseModel):
     label: str
     vector: list[float] = Field(min_length=42, max_length=42)
 
+    @field_validator("vector")
+    @classmethod
+    def finite_vector(cls, vector):
+        if not all(math.isfinite(x) for x in vector):
+            raise ValueError("vector must contain finite numbers")
+        return vector
+
+
+class SampleBatchIn(BaseModel):
+    vectors: list[list[float]] = Field(min_length=15, max_length=15)
+
+    @field_validator("vectors")
+    @classmethod
+    def valid_batch(cls, vectors):
+        for vector in vectors:
+            if len(vector) != 42 or not all(math.isfinite(x) for x in vector):
+                raise ValueError("each vector must contain 42 finite numbers")
+        return vectors
+
 
 class RequestIn(BaseModel):
     patient_id: str
     label: str
     confidence: float = Field(ge=0, le=1)
     source: str = "browser"
+    client_request_id: Optional[str] = Field(default=None, min_length=1, max_length=100)
 
 
 class AckIn(BaseModel):
@@ -46,6 +67,7 @@ class AckIn(BaseModel):
 
 class DeviceAckIn(BaseModel):
     device_id: str
+    request_id: Optional[str] = None
 
 
 class HeartbeatIn(BaseModel):
@@ -59,6 +81,7 @@ class TtsIn(BaseModel):
 
 class FeedbackIn(BaseModel):
     correct: bool
+    intended_label: Optional[Literal["water", "pain", "help", "bathroom", "neutral"]] = None
 
 
 class LabelStats(BaseModel):
@@ -81,6 +104,7 @@ class SessionIn(BaseModel):
     """Gesture session summary from web/src/cv/session.ts (contract section 19)."""
     model_config = ConfigDict(extra="allow")
     patient_id: str
+    session_id: Optional[str] = Field(default=None, min_length=1, max_length=100)
     started_at: str
     ended_at: str
     config_version: int = 1

@@ -14,8 +14,10 @@ def state(device_id: str = config.DEFAULT_DEVICE_ID):
 
 @router.post("/ack")
 def ack(body: DeviceAckIn):
-    req = store.latest_open_request()
+    req = store.get_request(body.request_id) if body.request_id is not None else store.latest_open_request()
     if req is None:
+        if body.request_id is not None:
+            raise HTTPException(404, f"unknown request {body.request_id}")
         raise HTTPException(409, "no open request to acknowledge")
     return escalation.acknowledge(req["id"], "button")
 

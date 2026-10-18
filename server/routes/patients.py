@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import store
 from ..deps import get_patient
-from ..models import AdaptConfigIn, SampleIn
+from ..models import AdaptConfigIn, SampleIn, SampleBatchIn
 from ..adaptation import clean_settings
 
 router = APIRouter(prefix="/api/patients")
@@ -23,6 +23,13 @@ def add_sample(body: SampleIn, p: dict = Depends(get_patient)):
     return store.add_sample(p["id"], body.label, body.vector)
 
 
+@router.put("/{patient_id}/samples/{label}")
+def replace_label_samples(label: str, body: SampleBatchIn, p: dict = Depends(get_patient)):
+    if label not in {w["label"] for w in p["vocabulary"]} | {"neutral"}:
+        raise HTTPException(422, "unknown movement label")
+    return store.replace_samples(p["id"], label, body.vectors)
+
+
 @router.delete("/{patient_id}/samples")
 def reset_samples(p: dict = Depends(get_patient)):
     return {"deleted": store.delete_samples(p["id"])}
@@ -36,6 +43,11 @@ def get_adapt_config(p: dict = Depends(get_patient)):
 @router.get("/{patient_id}/sessions")
 def session_reports(p: dict = Depends(get_patient)):
     return store.recent_sessions(p["id"], 5)
+
+
+@router.get("/{patient_id}/feedback")
+def feedback_history(p: dict = Depends(get_patient)):
+    return store.recent_feedback(p["id"], 100)
 
 
 @router.put("/{patient_id}/adapt-config")

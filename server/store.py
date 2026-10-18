@@ -49,6 +49,17 @@ def delete_samples(patient_id: str) -> int:
         return conn.execute("DELETE FROM samples WHERE patient_id=?", (patient_id,)).rowcount
 
 
+def replace_samples(patient_id: str, label: str, vectors: list[list[float]]) -> list[dict]:
+    with db.connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM samples WHERE patient_id=? AND label=?", (patient_id, label))
+        conn.executemany("INSERT INTO samples (patient_id,label,vector,created_at) VALUES (?,?,?,?)",
+                         [(patient_id, label, db.dumps(v), now_iso()) for v in vectors])
+        rows = conn.execute("SELECT * FROM samples WHERE patient_id=? AND label=? ORDER BY n",
+                            (patient_id, label)).fetchall()
+    return [_sample(row) for row in rows]
+
+
 # Requests
 
 def _request(row) -> dict:
@@ -60,14 +71,27 @@ def _request(row) -> dict:
 
 
 def create_request(patient_id: str, label: str, confidence: float, source: str) -> dict:
+    return create_request_once(patient_id, label, confidence, source)[0]
+
+
+def create_request_once(patient_id: str, label: str, confidence: float, source: str,
+                        client_request_id: str | None = None) -> tuple[dict, bool]:
     word = next(w for w in PATIENTS[patient_id]["vocabulary"] if w["label"] == label)
     with db.connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if client_request_id is not None:
+            existing = conn.execute("SELECT * FROM requests WHERE patient_id=? AND client_request_id=?",
+                                    (patient_id, client_request_id)).fetchone()
+            if existing:
+                if (existing["label"], existing["confidence"], existing["source"]) != (label, confidence, source):
+                    raise ValueError("Request key already used for a different request")
+                return _request(existing), False
         cur = conn.execute(
-            "INSERT INTO requests (patient_id, label, display, speech, confidence, source, created_at)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (patient_id, label, word["display"], word["speech"], confidence, source, now_iso()))
+            "INSERT INTO requests (patient_id, label, display, speech, confidence, source, created_at, client_request_id)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (patient_id, label, word["display"], word["speech"], confidence, source, now_iso(), client_request_id))
         row = conn.execute("SELECT * FROM requests WHERE n=?", (cur.lastrowid,)).fetchone()
-    return _request(row)
+    return _request(row), True
 
 
 def get_request(request_id: str) -> Optional[dict]:
@@ -101,15 +125,21 @@ def latest_open_request() -> Optional[dict]:
 
 
 def ack_request(request_id: str, by: str) -> Optional[dict]:
+    return ack_request_once(request_id, by)[0]
+
+
+def ack_request_once(request_id: str, by: str) -> tuple[Optional[dict], bool]:
     """Ack an open request. Returns the request, or None if not found. Acking twice changes nothing."""
     n = _n(request_id, "r")
     if n is None:
-        return None
+        return None, False
     with db.connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT * FROM requests WHERE n=?", (n,)).fetchone()
         if row is None:
-            return None
-        if row["status"] == "open":
+            return None, False
+        changed = row["status"] == "open"
+        if changed:
             acked_at = datetime.now(timezone.utc)
             latency = int((acked_at - parse_iso(row["created_at"])).total_seconds() * 1000)
             conn.execute("UPDATE requests SET status='acked', acked_at=?, acked_by=?, ack_latency_ms=?"
@@ -119,7 +149,7 @@ def ack_request(request_id: str, by: str) -> Optional[dict]:
                          " acked_until=excluded.acked_until",
                          (config.DEFAULT_DEVICE_ID, n, time.time() + config.ACKED_DISPLAY_S))
             row = conn.execute("SELECT * FROM requests WHERE n=?", (n,)).fetchone()
-    return _request(row)
+    return _request(row), changed
 
 
 def claim_escalation(request_id: str, level: int) -> bool:
@@ -191,8 +221,18 @@ def device_state(device_id: str) -> dict:
 
 def add_session(summary: dict, synthetic: bool = False) -> dict:
     with db.connect() as conn:
-        cur = conn.execute("INSERT INTO cv_sessions (patient_id, summary, synthetic, created_at) VALUES (?,?,?,?)",
-                           (summary["patient_id"], db.dumps(summary), int(synthetic), now_iso()))
+        conn.execute("BEGIN IMMEDIATE")
+        session_id = summary.get("session_id")
+        if session_id:
+            existing = conn.execute("SELECT * FROM cv_sessions WHERE patient_id=? AND session_id=?",
+                                    (summary["patient_id"], session_id)).fetchone()
+            if existing:
+                saved = json.loads(existing["summary"])
+                if saved != summary:
+                    raise ValueError("Session key already used for a different report")
+                return {"id": f"cs_{existing['n']}", **saved}
+        cur = conn.execute("INSERT INTO cv_sessions (patient_id, summary, synthetic, created_at, session_id) VALUES (?,?,?,?,?)",
+                           (summary["patient_id"], db.dumps(summary), int(synthetic), now_iso(), session_id))
     return {"id": f"cs_{cur.lastrowid}", **summary}
 
 
@@ -212,27 +252,45 @@ def delete_synthetic_sessions(patient_id: str) -> int:
 
 # Caregiver feedback on requests
 
-def add_feedback(request_id: str, correct: bool) -> Optional[dict]:
+def add_feedback(request_id: str, correct: bool, intended_label: str | None = None) -> Optional[dict]:
     req = get_request(request_id)
     if req is None:
         return None
+    if correct and intended_label is not None and intended_label != req["label"]:
+        raise ValueError("A correct answer must name the predicted word")
+    if not correct and intended_label == req["label"]:
+        raise ValueError("An incorrect answer must name a different word")
     created = now_iso()
     with db.connect() as conn:
-        cur = conn.execute("INSERT INTO feedback (request_n, patient_id, correct, created_at) VALUES (?,?,?,?)",
-                           (_n(request_id, "r"), req["patient_id"], int(correct), created))
-    return {"id": f"f_{cur.lastrowid}", "request_id": request_id, "correct": correct, "created_at": created}
+        conn.execute("BEGIN IMMEDIATE")
+        previous = conn.execute("SELECT * FROM feedback WHERE request_n=? ORDER BY n DESC LIMIT 1",
+                                (_n(request_id, "r"),)).fetchone()
+        if previous:
+            n = previous["n"]
+            if bool(previous["correct"]) == correct and previous["intended_label"] == intended_label:
+                created = previous["created_at"]
+            else:
+                conn.execute("UPDATE feedback SET correct=?,intended_label=?,created_at=? WHERE n=?",
+                             (int(correct), intended_label, created, n))
+        else:
+            cur = conn.execute("INSERT INTO feedback (request_n, patient_id, correct, created_at, intended_label) VALUES (?,?,?,?,?)",
+                               (_n(request_id, "r"), req["patient_id"], int(correct), created, intended_label))
+            n = cur.lastrowid
+    return {"id": f"f_{n}", "request_id": request_id, "correct": correct,
+            "intended_label": intended_label, "created_at": created}
 
 
 def recent_feedback(patient_id: str, limit: int = 20) -> list[dict]:
     """Newest first, joined with the request so the agent knows what was flagged."""
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT f.n, f.correct, f.created_at, r.n AS rn, r.label, r.confidence, r.source"
+            "SELECT f.n, f.correct, f.intended_label, f.created_at, r.n AS rn, r.label, r.confidence, r.source"
             " FROM feedback f JOIN requests r ON r.n = f.request_n"
-            " WHERE f.patient_id=? ORDER BY f.n DESC LIMIT ?", (patient_id, limit)).fetchall()
+            " WHERE f.patient_id=? AND f.n=(SELECT MAX(v.n) FROM feedback v WHERE v.request_n=f.request_n)"
+            " ORDER BY f.created_at DESC LIMIT ?", (patient_id, limit)).fetchall()
     return [{"id": f"f_{r['n']}", "request_id": f"r_{r['rn']}", "label": r["label"],
              "confidence": r["confidence"], "source": r["source"], "correct": bool(r["correct"]),
-             "created_at": r["created_at"]} for r in rows]
+             "intended_label": r["intended_label"], "created_at": r["created_at"]} for r in rows]
 
 
 # Approved AdaptConfig

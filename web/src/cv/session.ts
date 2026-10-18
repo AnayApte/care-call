@@ -5,6 +5,7 @@ type Stats = {
   min_conf: number; mean_hold_frames_to_fire: number;
 };
 export type SessionSummary = {
+  session_id?: string;
   patient_id: string; started_at: string; ended_at: string; config_version: number;
   labels: Partial<Record<RequestLabel, Stats>>;
   confusions: { intended: Label; predicted: Label; count: number }[];
@@ -15,6 +16,7 @@ export type SessionSummary = {
  * attempt's mean confidence, holdFrames is its actual observed frame count.
  */
 export function createSession(patientId: string, configVersion = 1, startedAt = new Date()) {
+  const sessionId = crypto.randomUUID();
   const labels: SessionSummary["labels"] = {};
   const totals = new Map<RequestLabel, { confidence: number; frames: number }>();
   const confusions: SessionSummary["confusions"] = [];
@@ -47,7 +49,7 @@ export function createSession(patientId: string, configVersion = 1, startedAt = 
       if (intended === "neutral") falseNeutral++;
     },
     snapshot(endedAt = new Date()): SessionSummary {
-      return structuredClone({ patient_id: patientId, started_at: startedAt.toISOString(), ended_at: endedAt.toISOString(),
+      return structuredClone({ session_id: sessionId, patient_id: patientId, started_at: startedAt.toISOString(), ended_at: endedAt.toISOString(),
         config_version: configVersion, labels, confusions, false_triggers_neutral: falseNeutral });
     },
   };

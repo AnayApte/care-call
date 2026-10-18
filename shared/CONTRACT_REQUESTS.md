@@ -22,3 +22,6 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 2026-10-17 | josh | Josh requested hand-controlled Yes/No feedback. Added fixed thumbs-up/down detection while that prompt is open, with a one-second hold and release first. Patient hook, page and styling edits are authorized. Buttons, request learning and CREAO approval stay separate. No API changes or new libraries.
 
 2026-10-17 | josh | Josh identified that patient thumbs could be mistaken for caregiver answers. Removed shared-camera thumb input and kept explicit caregiver buttons. A separate caregiver camera flow needs its own review context; handedness is not identity.
+
+2026-10-18 | josh | Josh requested a separate 2.0 implementation contract and software-first validation while hardware teammates are away. Added shared/contract-v2.md and linked it from AGENTS.md and CLAUDE.md. V2 governs this completion phase, preserves ownership and defines planned additive APIs, optional caregiver feedback and separate software/hardware checks. The original contract and fixtures are unchanged.
+2026-10-18 | josh | Josh asked to build the 2.0 software contract and push to his own branch. This authorizes the patient/caregiver web and server additions described in v2 for this branch. Hardware, the original contract and fixtures stay unchanged. No new libraries.

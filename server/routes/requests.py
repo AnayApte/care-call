@@ -18,11 +18,16 @@ def create_request(body: RequestIn):
     if body.label not in labels:
         raise HTTPException(422, f"label must be one of {sorted(labels)} (never neutral)")
     with sentry_sdk.start_span(op="request.create", name=f"request.create {body.label}") as span:
-        req = store.create_request(body.patient_id, body.label, body.confidence, body.source)
+        try:
+            req, created = store.create_request_once(body.patient_id, body.label, body.confidence,
+                                                     body.source, body.client_request_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
         span.set_data("request_id", req["id"])
         span.set_data("source", body.source)
         span.set_data("confidence", body.confidence)
-        escalation.start(req)
+        if created:
+            escalation.start(req)
     return req
 
 
@@ -37,6 +42,14 @@ def list_requests(patient_id: Optional[str] = None, since: Optional[str] = None)
     return store.list_requests(patient_id, since_dt)
 
 
+@router.get("/{request_id}")
+def get_request(request_id: str):
+    req = store.get_request(request_id)
+    if req is None:
+        raise HTTPException(404, f"unknown request {request_id}")
+    return req
+
+
 @router.post("/{request_id}/ack")
 def ack(request_id: str, body: AckIn):
     req = escalation.acknowledge(request_id, body.by)
@@ -47,7 +60,10 @@ def ack(request_id: str, body: AckIn):
 
 @router.post("/{request_id}/feedback", status_code=201)
 def feedback(request_id: str, body: FeedbackIn):
-    fb = store.add_feedback(request_id, body.correct)
+    try:
+        fb = store.add_feedback(request_id, body.correct, body.intended_label)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     if fb is None:
         raise HTTPException(404, f"unknown request {request_id}")
     return fb

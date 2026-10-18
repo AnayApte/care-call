@@ -6,6 +6,7 @@ import { DISPLAY_WORD } from "../lib/labels";
 import { LABELS } from "../cv/types";
 import type { SessionSummary } from "../cv/session";
 import ReportSummary from "../components/ReportSummary";
+import RequestInbox from "../components/RequestInbox";
 import "./caregiver.css";
 
 type Phase = "idle" | "starting" | "pending" | "paused";
@@ -98,11 +99,12 @@ export default function CaregiverPage() {
   }));
   return <main className="caregiver">
     <header className="cg-header"><a href="/patient" className="cg-brand">Care Call <span> / caregiver</span></a><a href="/patient">Patient screen ↗</a></header>
-    <div className="cg-heading"><div><p className="cg-eyebrow">MOVEMENT REVIEW</p><h1>A little easier, together.</h1><p>Review Maria’s recent practice and choose whether to adjust her settings.</p></div>
+    <div className="cg-heading"><div><p className="cg-eyebrow">CAREGIVER</p><h1>A little easier, together.</h1><p>Answer Maria’s requests, then review her recent practice.</p></div>
       <button className="cg-button cg-secondary" onClick={() => { void refresh(); }} disabled={phase === "starting"}>Refresh</button></div>
     {error && <p className="cg-message cg-error" role="alert">{error}</p>}
     {notice && <p className="cg-message" role="status">{notice}</p>}
     {!loaded && <p role="status">Loading recent practice…</p>}
+    <RequestInbox />
     <div className="cg-grid">
       <section className="cg-card"><p className="cg-eyebrow">01 / RECENT PRACTICE</p><h2>The usage report</h2>
         <p>Latest {reports.length} saved sessions. A request sends after a movement is held steadily.</p>
