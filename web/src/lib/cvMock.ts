@@ -16,8 +16,6 @@ const SAMPLES_PER_LABEL = 15;
 const HOLD_MS = 3000;
 const SLOT_MS = 200;
 const MAX_FRAME_GAP_MS = 500;
-const HOLD_FRAMES = 12;
-const MIN_CONFIDENCE = 0.8;
 const COOLDOWN_MS = 8000;
 
 // A resting hand, roughly MediaPipe's 21 points, in normalised image coordinates.
@@ -112,50 +110,66 @@ export function createSampleCapture(label: Label, startedAt: number) {
   };
 }
 
-/** Nearest-centroid stand-in for the personal kNN. Recognition needs all five labels trained. */
+/** Stand-in for Josh's personal kNN: k nearest stored samples vote, confidence is the vote share.
+ * Recognition needs all five labels trained. */
+const K_NEIGHBOURS = 7;
 export function createPersonalClassifier() {
-  let centroids: { label: Label; centre: number[] }[] = [];
+  let samples: Sample[] = [];
+  let ready = false;
   return {
-    setSamples(samples: Sample[]) {
-      centroids = LABELS.flatMap((label) => {
-        const own = samples.filter((s) => s.label === label);
-        if (own.length < SAMPLES_PER_LABEL) return [];
-        const centre = Array.from({ length: VECTOR_SIZE }, (_, i) => own.reduce((acc, s) => acc + s.vector[i], 0) / own.length);
-        return [{ label, centre }];
-      });
+    setSamples(next: Sample[]) {
+      samples = next.filter((s) => s.vector.length === VECTOR_SIZE);
+      ready = LABELS.every((label) => samples.filter((s) => s.label === label).length >= SAMPLES_PER_LABEL);
     },
-    isReady: () => centroids.length === LABELS.length,
+    isReady: () => ready,
     predict(vector: number[]): Prediction | null {
-      if (centroids.length !== LABELS.length) return null;
-      const dists = centroids.map((c) => ({ label: c.label, d: Math.hypot(...c.centre.map((v, i) => v - vector[i])) }));
-      dists.sort((a, b) => a.d - b.d);
-      // 0 when the two nearest centroids are equally close, near 1 when the best is far ahead.
-      const confidence = dists[1].d > 0 ? 1 - dists[0].d / dists[1].d : 1;
-      return { label: dists[0].label, confidence };
+      if (!ready || vector.length !== VECTOR_SIZE) return null;
+      const nearest = samples
+        .map((s) => { let d = 0; for (let i = 0; i < VECTOR_SIZE; i += 1) { const diff = s.vector[i] - vector[i]; d += diff * diff; } return { label: s.label, d }; })
+        .sort((a, b) => a.d - b.d)
+        .slice(0, K_NEIGHBOURS);
+      const votes = new Map<Label, number>();
+      for (const n of nearest) votes.set(n.label, (votes.get(n.label) ?? 0) + 1);
+      const [label, count] = [...votes.entries()].sort((a, b) => b[1] - a[1])[0];
+      return { label, confidence: count / nearest.length };
     },
   };
 }
 
-/** Same contract as Josh's trigger.ts: 12 matching frames at 0.8, then an 8 s cooldown. Never fires on neutral. */
+/** Stand-in for Josh's trigger. Fills while the same request label is seen with enough confidence, drains gently
+ * when it is not, so a single odd frame does not wipe the ring. Fires after about a second of fill, then cools down.
+ * Never fires on neutral. */
+const TRIGGER_HOLD_MS = 1000;
+const TRIGGER_DRAIN_MS = 450;
+const TRIGGER_MIN_CONFIDENCE = 0.7;
 export function createGestureTrigger() {
   let label: Label | null = null;
-  let frames = 0;
+  let progress = 0;
+  let lastTs: number | null = null;
   let cooldownUntil = 0;
   return {
     update(prediction: Prediction | null, now: number): TriggerState {
+      const dt = lastTs === null ? 0 : Math.max(0, Math.min(100, now - lastTs));
+      lastTs = now;
       const cooldownMs = Math.max(0, cooldownUntil - now);
-      const usable = prediction && prediction.label !== "neutral" && prediction.confidence >= MIN_CONFIDENCE ? prediction : null;
-      if (!usable || cooldownMs > 0) { label = null; frames = 0; return { label: null, progress: 0, cooldownMs, fired: null }; }
-      frames = usable.label === label ? frames + 1 : 1;
-      label = usable.label;
-      if (frames >= HOLD_FRAMES) {
+      const usable = prediction && prediction.label !== "neutral" && prediction.confidence >= TRIGGER_MIN_CONFIDENCE ? prediction : null;
+      if (cooldownMs > 0) { label = null; progress = 0; return { label: null, progress: 0, cooldownMs, fired: null }; }
+      if (usable && (label === null || usable.label === label)) {
+        label = usable.label;
+        progress = Math.min(1, progress + dt / TRIGGER_HOLD_MS);
+      } else {
+        progress = Math.max(0, progress - dt / TRIGGER_DRAIN_MS);
+        if (progress === 0) label = usable ? usable.label : null;
+        if (usable && label === usable.label) progress = Math.min(1, progress + dt / TRIGGER_HOLD_MS);
+      }
+      if (progress >= 1 && label) {
         cooldownUntil = now + COOLDOWN_MS;
-        const fired = { label: usable.label, confidence: usable.confidence };
-        label = null; frames = 0;
+        const fired = { label, confidence: usable?.confidence ?? TRIGGER_MIN_CONFIDENCE };
+        label = null; progress = 0;
         return { label: fired.label, progress: 1, cooldownMs: COOLDOWN_MS, fired };
       }
-      return { label, progress: frames / HOLD_FRAMES, cooldownMs: 0, fired: null };
+      return { label: progress > 0 ? label : null, progress, cooldownMs: 0, fired: null };
     },
-    reset() { label = null; frames = 0; },
+    reset() { label = null; progress = 0; lastTs = null; },
   };
 }

@@ -39,7 +39,7 @@
 .ring { position: relative; width: var(--ring-size); height: var(--ring-size); flex: none; box-shadow: none; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring .track { fill: none; stroke: var(--ring-track); stroke-width: 14; }
-.ring .fill { fill: none; stroke: var(--pine); stroke-width: 14; stroke-dasharray: 471; transition: stroke-dashoffset 120ms linear, stroke var(--duration-fast); }
+.ring .fill { fill: none; stroke: var(--pine); stroke-width: 14; stroke-dasharray: 471; transition: stroke-dashoffset 90ms linear, stroke var(--duration-fast); }
 .ring.countdown .fill { stroke: var(--signal); }
 .ring .label { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 56px; }
 .ring .label.small { font-size: 22px; font-weight: 500; }
