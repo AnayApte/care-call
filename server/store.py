@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from . import config, db
-from .models import PATIENTS
+from .models import DEFAULT_ADAPT_CONFIG, PATIENTS
 
 
 def now_iso() -> str:
@@ -164,3 +164,67 @@ def device_state(device_id: str) -> dict:
                 "active_request": {"id": req["id"], "display": req["display"], "created_at": req["created_at"]},
                 "message": None}
     return {"device_id": device_id, "mode": "idle", "active_request": None, "message": None}
+
+
+# CV session summaries (contract section 19)
+
+def add_session(summary: dict, synthetic: bool = False) -> dict:
+    with db.connect() as conn:
+        cur = conn.execute("INSERT INTO cv_sessions (patient_id, summary, synthetic, created_at) VALUES (?,?,?,?)",
+                           (summary["patient_id"], db.dumps(summary), int(synthetic), now_iso()))
+    return {"id": f"cs_{cur.lastrowid}", **summary}
+
+
+def recent_sessions(patient_id: str, limit: int = 5) -> list[dict]:
+    """Newest first, by when the session ended."""
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM cv_sessions WHERE patient_id=?", (patient_id,)).fetchall()
+    sessions = [{"id": f"cs_{r['n']}", **json.loads(r["summary"])} for r in rows]
+    sessions.sort(key=lambda x: x.get("ended_at", ""), reverse=True)
+    return sessions[:limit]
+
+
+def delete_synthetic_sessions(patient_id: str) -> int:
+    with db.connect() as conn:
+        return conn.execute("DELETE FROM cv_sessions WHERE patient_id=? AND synthetic=1", (patient_id,)).rowcount
+
+
+# Caregiver feedback on requests
+
+def add_feedback(request_id: str, correct: bool) -> Optional[dict]:
+    req = get_request(request_id)
+    if req is None:
+        return None
+    created = now_iso()
+    with db.connect() as conn:
+        cur = conn.execute("INSERT INTO feedback (request_n, patient_id, correct, created_at) VALUES (?,?,?,?)",
+                           (_n(request_id, "r"), req["patient_id"], int(correct), created))
+    return {"id": f"f_{cur.lastrowid}", "request_id": request_id, "correct": correct, "created_at": created}
+
+
+def recent_feedback(patient_id: str, limit: int = 20) -> list[dict]:
+    """Newest first, joined with the request so the agent knows what was flagged."""
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT f.n, f.correct, f.created_at, r.n AS rn, r.label, r.confidence, r.source"
+            " FROM feedback f JOIN requests r ON r.n = f.request_n"
+            " WHERE f.patient_id=? ORDER BY f.n DESC LIMIT ?", (patient_id, limit)).fetchall()
+    return [{"id": f"f_{r['n']}", "request_id": f"r_{r['rn']}", "label": r["label"],
+             "confidence": r["confidence"], "source": r["source"], "correct": bool(r["correct"]),
+             "created_at": r["created_at"]} for r in rows]
+
+
+# Approved AdaptConfig
+
+def get_adapt_config(patient_id: str) -> dict:
+    with db.connect() as conn:
+        row = conn.execute("SELECT config FROM adapt_configs WHERE patient_id=?", (patient_id,)).fetchone()
+    return json.loads(row["config"]) if row else dict(DEFAULT_ADAPT_CONFIG)
+
+
+def set_adapt_config(patient_id: str, config_value: dict) -> dict:
+    with db.connect() as conn:
+        conn.execute("INSERT INTO adapt_configs (patient_id, config, updated_at) VALUES (?,?,?)"
+                     " ON CONFLICT(patient_id) DO UPDATE SET config=excluded.config, updated_at=excluded.updated_at",
+                     (patient_id, db.dumps(config_value), now_iso()))
+    return config_value

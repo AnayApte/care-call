@@ -1,0 +1,61 @@
+/* Shared scaffold for onboarding mockups. Not product code. */
+:root {
+  --paper: #f3efe7;
+  --paper-2: #e9e3d6;
+  --ink: #1b1f1d;
+  --mute: #6b7370;
+  --pine: #1f6f5b;
+  --pine-soft: #cfe3dc;
+  --signal: #d8a24a;
+  --ring-track: rgba(27, 31, 29, 0.14);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #d9d4ca; color: var(--ink); }
+body { padding: 48px 40px 80px; }
+.sheet-title { max-width: 1240px; margin: 0 auto 28px; }
+.sheet-title h1 { font-size: 28px; margin: 0 0 6px; font-weight: 600; }
+.sheet-title p { margin: 0; color: #4b524f; font-size: 15px; max-width: 70ch; }
+.sheet-title a { color: var(--pine); }
+.frames { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px 32px; max-width: 1240px; margin: 0 auto; }
+.frame-wrap { }
+.frame-wrap figcaption { margin: 12px 2px 0; font-size: 14px; color: #3c423f; }
+.frame-wrap figcaption b { font-weight: 600; }
+.frame-wrap figure { margin: 0; }
+
+/* A 1280x800 laptop viewport scaled to fit the column. */
+.viewport { width: 100%; aspect-ratio: 1280 / 800; position: relative; overflow: hidden; border-radius: 10px; box-shadow: 0 30px 60px -30px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.08); background: #222; }
+.screen { position: absolute; inset: 0; width: 1280px; height: 800px; transform-origin: 0 0; transform: scale(var(--s, .47)); }
+
+/* Stand-in for the mirrored webcam feed: a dim room with a vignette. */
+.cam { position: absolute; inset: 0; overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 110%, rgba(255,255,255,0) 40%, rgba(0,0,0,.45) 100%),
+    radial-gradient(60% 50% at 35% 40%, #8a8a86 0%, #5e5f5c 55%, #46474a 100%);
+}
+.cam::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.22)); }
+.cam .room-line { position: absolute; left: 0; right: 0; top: 54%; height: 1px; background: rgba(255,255,255,.08); }
+.cam .window { position: absolute; left: 7%; top: 10%; width: 22%; height: 36%; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+/* Light the room less when the state asks for calm. */
+.cam.dim { filter: brightness(.72); }
+
+/* Hand landmark skeleton, roughly where a raised right hand sits in the frame. */
+.hand { position: absolute; left: 58%; top: 22%; width: 300px; height: 360px; }
+.hand line { stroke: rgba(255,255,255,.55); stroke-width: 2; }
+.hand circle { fill: #fff; opacity: .9; }
+.hand.live line { stroke: var(--pine-soft); }
+.hand.live circle { fill: #fff; }
+.hand.faint { opacity: .35; }
+
+/* Generic ring; variants restyle it. */
+.ring { position: relative; width: 168px; height: 168px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { fill: none; stroke: var(--ring-track); stroke-width: 10; }
+.ring .fill { fill: none; stroke: var(--pine); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 471; }
+.ring .label { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 600; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 64px; padding: 0 36px; border-radius: 999px; font-size: 22px; font-weight: 600; border: 0; cursor: pointer; font-family: inherit; }
+.btn.primary { background: var(--pine); color: #fff; }
+.btn.quiet { background: transparent; color: var(--ink); border: 2px solid rgba(27,31,29,.25); }
+
+.reset { position: absolute; right: 36px; top: 30px; height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); color: #fff; background: rgba(0,0,0,.25); font-size: 16px; font-family: inherit; display: inline-flex; align-items: center; gap: 8px; }
+.notice { position: absolute; left: 36px; bottom: 26px; color: rgba(255,255,255,.7); font-size: 15px; }

@@ -34,15 +34,15 @@ def list_requests(patient_id: Optional[str] = None, since: Optional[str] = None)
 
 @router.post("/{request_id}/ack")
 def ack(request_id: str, body: AckIn):
-    req = store.ack_request(request_id, body.by)
+    req = escalation.acknowledge(request_id, body.by)
     if req is None:
         raise HTTPException(404, f"unknown request {request_id}")
     return req
 
 
-@router.post("/{request_id}/feedback")
+@router.post("/{request_id}/feedback", status_code=201)
 def feedback(request_id: str, body: FeedbackIn):
-    # Step 1 stub: stored for real in step 3.
-    if store.get_request(request_id) is None:
+    fb = store.add_feedback(request_id, body.correct)
+    if fb is None:
         raise HTTPException(404, f"unknown request {request_id}")
-    return {"request_id": request_id, "correct": body.correct}
+    return fb

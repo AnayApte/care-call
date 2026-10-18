@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Onboarding mockup A3: typographic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+  body, .screen { font-family: "Fraunces", Georgia, serif; }
+  /* The one bold thing: no panel. A light scrim over the whole feed and the word set as the object. */
+  .scrim { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(243,239,231,.96) 0%, rgba(243,239,231,.88) 42%, rgba(243,239,231,.25) 70%, rgba(243,239,231,.08) 100%); }
+  .scrim.full { background: rgba(243,239,231,.9); }
+  .col { position: absolute; left: 88px; top: 84px; bottom: 72px; width: 640px; display: flex; flex-direction: column; }
+  .meta { display: flex; align-items: baseline; gap: 18px; font-size: 20px; color: var(--mute); }
+  .meta .rule { flex: 1; height: 1px; background: rgba(27,31,29,.25); align-self: center; }
+  .word { font-size: 176px; line-height: .9; margin: 44px 0 30px; font-weight: 500; letter-spacing: -.03em; font-variation-settings: "opsz" 144, "SOFT" 50; }
+  .ask { font-size: 30px; line-height: 1.3; margin: 0; max-width: 24ch; font-weight: 400; }
+  .ask.ok { color: var(--pine); }
+  .hint { font-size: 20px; color: var(--mute); margin: 14px 0 0; font-style: italic; }
+  .foot { margin-top: auto; display: flex; align-items: center; gap: 32px; }
+  .foot .status { font-size: 20px; color: var(--mute); margin: 0; font-style: italic; }
+  .btn.primary { font-family: inherit; font-weight: 500; letter-spacing: 0; }
+  /* dotted ring that fills solid */
+  .ring { width: 150px; height: 150px; }
+  .ring .track { stroke: rgba(27,31,29,.35); stroke-width: 3; stroke-dasharray: 2 9; stroke-linecap: round; }
+  .ring .fill { stroke: var(--pine); stroke-width: 5; stroke-linecap: butt; }
+  .ring .label { font-size: 60px; font-weight: 500; color: var(--ink); }
+  .ring .label.small { font-size: 19px; font-style: italic; color: var(--pine); font-weight: 400; }
+  .ring.done .fill { stroke-dashoffset: 0; }
+  .ring.done .label { color: var(--pine); }
+  /* step marks are five short dashes */
+  .marks { display: flex; gap: 6px; }
+  .marks span { width: 28px; height: 2px; background: rgba(27,31,29,.25); }
+  .marks span.done { background: var(--pine); }
+  .marks span.now { background: var(--ink); height: 3px; }
+  /* listening */
+  .live .scrim { background: linear-gradient(0deg, rgba(243,239,231,.95) 0%, rgba(243,239,231,.7) 34%, rgba(243,239,231,0) 60%); }
+  .live .word { position: absolute; left: 88px; bottom: 96px; margin: 0; font-size: 190px; }
+  .live .ask { position: absolute; left: 92px; bottom: 56px; font-size: 22px; color: var(--mute); font-style: italic; }
+  .live .ring { position: absolute; right: 96px; bottom: 80px; width: 200px; height: 200px; }
+  .live .reset { color: var(--ink); background: rgba(243,239,231,.7); border-color: rgba(27,31,29,.3); font-family: inherit; }
+</style>
+</head>
+<body>
+<header class="sheet-title">
+  <h1>A3: Typographic</h1>
+  <p>No panel. A light scrim fades across the feed from the left and the word is set in Fraunces as the object on screen. Step marks are five dashes. The ring is a dotted hairline that fills solid. The quietest of the three. <a href="index.html">All variations</a></p>
+</header>
+<section class="frames">
+
+<figure class="frame-wrap"><div class="viewport"><div class="screen">
+  <div class="cam"><div class="window"></div><div class="room-line"></div></div>
+  <div class="scrim"></div>
+  <div class="col">
+    <div class="meta"><span>2 of 5</span><span class="rule"></span><div class="marks"><span class="done"></span><span class="now"></span><span></span><span></span><span></span></div></div>
+    <h2 class="word">Water</h2>
+    <p class="ask">Ask them to make their movement for water, and hold it.</p>
+    <p class="hint">Any movement they can repeat works.</p>
+    <div class="foot"><button class="btn primary">Start</button><p class="status">Waiting for a hand to come into the picture.</p></div>
+  </div>
+</div></div><figcaption><b>1. Waiting.</b> The word carries the screen. Start is the only control.</figcaption></figure>
+
+<figure class="frame-wrap"><div class="viewport"><div class="screen">
+  <div class="cam"><div class="window"></div><div class="room-line"></div><svg class="hand faint"></svg></div>
+  <div class="scrim"></div>
+  <div class="col">
+    <div class="meta"><span>2 of 5</span><span class="rule"></span><div class="marks"><span class="done"></span><span class="now"></span><span></span><span></span><span></span></div></div>
+    <h2 class="word">Water</h2>
+    <p class="ask">Ask them to make their movement for water, and hold it.</p>
+    <p class="hint">Get ready.</p>
+    <div class="foot"><div class="ring"><svg viewBox="0 0 168 168"><circle class="track" cx="84" cy="84" r="75"/><circle class="fill" cx="84" cy="84" r="75" style="stroke:var(--signal);stroke-dashoffset:314"/></svg><div class="label">2</div></div><p class="status">Recording starts in a moment.</p></div>
+  </div>
+</div></div><figcaption><b>2. Countdown.</b> The button becomes the ring in place. Digit in the signal colour.</figcaption></figure>
+
+<figure class="frame-wrap"><div class="viewport"><div class="screen">
+  <div class="cam"><div class="window"></div><div class="room-line"></div><svg class="hand live"></svg></div>
+  <div class="scrim"></div>
+  <div class="col">
+    <div class="meta"><span>2 of 5</span><span class="rule"></span><div class="marks"><span class="done"></span><span class="now"></span><span></span><span></span><span></span></div></div>
+    <h2 class="word">Water</h2>
+    <p class="ask">Ask them to make their movement for water, and hold it.</p>
+    <p class="hint">Hold until the ring is full. Big movements start it over.</p>
+    <div class="foot"><div class="ring"><svg viewBox="0 0 168 168"><circle class="track" cx="84" cy="84" r="75"/><circle class="fill" cx="84" cy="84" r="75" style="stroke-dashoffset:190"/></svg><div class="label small">Hold still</div></div><p class="status">Recording.</p></div>
+  </div>
+</div></div><figcaption><b>3. Holding.</b> The solid pine stroke overtakes the dotted track. Landmarks pale green on the hand, which stays visible on the right.</figcaption></figure>
+
+<figure class="frame-wrap"><div class="viewport"><div class="screen">
+  <div class="cam dim"><div class="window"></div><div class="room-line"></div><svg class="hand faint"></svg></div>
+  <div class="scrim"></div>
+  <div class="col">
+    <div class="meta"><span>2 of 5</span><span class="rule"></span><div class="marks"><span class="done"></span><span class="done"></span><span class="now"></span><span></span><span></span></div></div>
+    <h2 class="word">Water</h2>
+    <p class="ask ok">Got it.</p>
+    <p class="hint">Next: pain.</p>
+    <div class="foot"><div class="ring done"><svg viewBox="0 0 168 168"><circle class="track" cx="84" cy="84" r="75"/><circle class="fill" cx="84" cy="84" r="75"/></svg><div class="label"><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div></div><p class="status">Saved. Check sound plays.</p></div>
+  </div>
+</div></div><figcaption><b>4. Label done.</b> Ring completes, check inside, the second dash turns pine. "Water" fades out upward and "Pain" fades in.</figcaption></figure>
+
+<figure class="frame-wrap"><div class="viewport"><div class="screen live">
+  <div class="cam"><div class="window"></div><div class="room-line"></div><svg class="hand live"></svg></div>
+  <div class="scrim"></div>
+  <button class="reset">Retrain movements</button>
+  <h2 class="word">Water</h2>
+  <p class="ask">Keep holding to send the request. Assistive prototype, not a medical device.</p>
+  <div class="ring"><svg viewBox="0 0 168 168"><circle class="track" cx="84" cy="84" r="75"/><circle class="fill" cx="84" cy="84" r="75" style="stroke-dashoffset:120"/></svg><div class="label small">Sending</div></div>
+</div></div><figcaption><b>5. Listening.</b> Scrim moves to the bottom so the feed is clear. Word bottom-left, dotted trigger ring bottom-right, Retrain top-right.</figcaption></figure>
+
+</section>
+<script src="hand.js"></script>
+</body>
+</html>

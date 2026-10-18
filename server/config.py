@@ -36,3 +36,9 @@ DEVICE_HEARTBEAT_TIMEOUT_S = 15
 ACKED_DISPLAY_S = 5
 ACKED_MESSAGE = "On the way"
 DEFAULT_DEVICE_ID = "beacon_1"
+
+# Photon bridge (server/photon-bridge). Shares a secret with the Python server.
+PHOTON_BRIDGE_URL = os.environ.get("PHOTON_BRIDGE_URL", "http://127.0.0.1:8787")
+BRIDGE_SECRET = os.environ.get("BRIDGE_SECRET") or DEVICE_TOKEN
+# One or more caregiver phones, comma separated, e.g. +15551234567
+CAREGIVER_PHONES = [p.strip() for p in os.environ.get("CAREGIVER_PHONE", "").split(",") if p.strip()]

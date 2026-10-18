@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import db, escalation
-from .routes import adapt, device, health, misc, patients, requests
+from .routes import adapt, device, health, misc, patients, photon, requests
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s %(message)s")
 
@@ -44,5 +44,5 @@ async def server_error(request: Request, exc: Exception):
     return JSONResponse({"error": "internal server error"}, status_code=500)
 
 
-for module in (health, patients, requests, device, misc, adapt):
+for module in (health, patients, requests, device, misc, adapt, photon):
     app.include_router(module.router)
