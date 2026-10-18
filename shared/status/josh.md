@@ -96,3 +96,13 @@ Removed website sound controls, training beeps and browser speech. External spea
 code is unchanged. 65 CV checks, typecheck, changed-file lint and build pass.
 The silent request/acknowledgement cycle has an automated check. Live caregiver
 branding checked. Training-save investigation is next; no recordings were reset.
+
+Training-save check (2026-10-18): local API 8007 has 75 saved recordings, 15 per
+movement. The save endpoint and browser permissions respond correctly. No current
+failure appeared on the real page at 5181; the original failure cause is unconfirmed.
+Fixed the misleading Retry button during an upload. The page now distinguishes
+Saving, Saved and a failed save, with a retained reason and retry button.
+An isolated browser test rejected synthetic uploads, kept them and saved them after
+Retry. It used ports 5182/8011, not the webcam or real database. Test services closed.
+67 CV checks, typecheck, changed-file lint and build pass. Removed the logo box
+only on the patient page; caregiver branding keeps its original treatment.

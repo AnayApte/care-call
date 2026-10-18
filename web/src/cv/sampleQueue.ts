@@ -44,11 +44,22 @@ export function createSampleQueue(base: string, patientId: string, storage?: Loc
       inFlight = (async () => {
         while (pending.length) {
           const batch = pending[0];
-          const response = await fetch(`${base.replace(/\/$/, "")}/api/patients/${encodeURIComponent(patientId)}/samples/${batch.label}`, {
-            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vectors: batch.vectors }),
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!response.ok) throw new Error(`Training save failed (${response.status}). Your recording is kept for retry.`);
+          let response: Response;
+          try {
+            response = await fetch(`${base.replace(/\/$/, "")}/api/patients/${encodeURIComponent(patientId)}/samples/${batch.label}`, {
+              method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vectors: batch.vectors }),
+              signal: AbortSignal.timeout(8000),
+            });
+          } catch (error) {
+            throw new Error(error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)
+              ? "The server took too long to save training." : "Could not reach the server to save training.");
+          }
+          if (!response.ok) {
+            let reason = "";
+            try { const body = await response.json(); if (typeof body?.error === "string") reason = body.error.slice(0, 200); }
+            catch { /* The status still explains a non-JSON error. */ }
+            throw new Error(`Server could not save training (${response.status})${reason ? `: ${reason}` : "."}`);
+          }
           pending = pending.filter(b => b !== batch); persist();
           onSaved?.(batch.label, batch.trainingKey);
         }

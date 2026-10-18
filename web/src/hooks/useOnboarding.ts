@@ -42,6 +42,8 @@ export type OnboardingState = {
   flow: DeliveryState;
   cameraError: string;
   savingTraining: boolean;
+  trainingPending: number;
+  trainingSaveError: string;
   feedback: "asking" | "correcting" | "done" | null;
   /** Leave-one-out accuracy of the personal model, once all five labels are trained. */
   accuracy: number | null;
@@ -54,7 +56,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, order: TRAINING_ORDER, canSkip: false, countdown: 0, progress: 0, hint: "", lifting: null,
     handPresent: false, trigger: idleTrigger, result: null, feedback: null, accuracy: null, toast: null,
-    flow: { phase: "waiting_release", request: null, input: null, error: "", online: true }, cameraError: "", savingTraining: false,
+    flow: { phase: "waiting_release", request: null, input: null, error: "", online: true }, cameraError: "", savingTraining: false, trainingPending: 0, trainingSaveError: "",
   });
 
   const reportsRef = useRef<ReturnType<typeof createSessionReporter> | null>(null);
@@ -119,11 +121,13 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     (label, key) => session.current.retraining.complete(label, true, key));
   const sampleQueue = sampleQueueRef.current;
   const saveTraining = useCallback(async () => {
-    patch({ savingTraining: true });
+    const pending = sampleQueue.pendingCount();
+    if (!pending) { patch({ savingTraining: false, trainingPending: 0, trainingSaveError: "" }); return; }
+    patch({ savingTraining: true, trainingPending: pending, trainingSaveError: "" });
     try { await sampleQueue.flush(); }
-    catch { toast("Training save failed. The recording is kept here; retry saving.", "error"); }
-    finally { patch({ savingTraining: sampleQueue.pendingCount() > 0 }); }
-  }, [sampleQueue, patch, toast]);
+    catch (error) { patch({ trainingSaveError: error instanceof Error ? error.message : "Training could not be saved to the server." }); }
+    finally { patch({ savingTraining: false, trainingPending: sampleQueue.pendingCount() }); }
+  }, [sampleQueue, patch]);
 
   useEffect(() => flow.subscribe(next => {
     const s = session.current;

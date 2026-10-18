@@ -49,9 +49,16 @@ export default function PatientPage() {
         <HandCanvas ref={canvasRef} />
       </div>
       <div className="patient-toolbar">
-        <a className="brand-link patient-brand" href="/patient" aria-label="Beacon patient screen"><Brand view="Patient" /></a>
+        <a className="brand-link patient-brand" href="/patient" aria-label="Beacon patient screen"><Brand view="Patient" overlay /></a>
         {!USE_MOCK_HAND && <CameraSelect value={cameraId} onChange={setCameraId} />}
-        {state.savingTraining && <div className="patient-tools"><button type="button" onClick={() => { void saveTraining(); }}>Retry training save</button></div>}
+        {(state.savingTraining || state.trainingPending > 0) && <div className="patient-tools training-save-status">
+          {state.savingTraining ? <p role="status">Saving training…</p> : <>
+            <div><p role="alert">Training not saved to server.</p>
+              <details className="training-save-details"><summary>Why?</summary><p>{state.trainingSaveError || "Training is waiting to save."}<br />Recording kept here. Keep this page open and retry.</p></details>
+            </div>
+            <button type="button" onClick={() => { void saveTraining(); }}>Retry training save</button>
+          </>}
+        </div>}
         <a className="patient-caregiver-link" href="/caregiver" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>Caregiver screen <span aria-hidden="true">↗</span></a>
         {canSkip && onboarding && phase !== "done" && (
           <div className="live-actions"><button type="button" className="btn-retrain" onClick={skipWord}>Not now</button></div>
@@ -95,8 +102,10 @@ export default function PatientPage() {
             )}
             {phase === "done" && (
               <>
-                <Ring progress={1} mode="done"><CheckMark /></Ring>
-                <p className="status">Saved<small>{hint}</small></p>
+                <Ring progress={1} mode={state.savingTraining || state.trainingPending ? "hold" : "done"} small>
+                  {state.savingTraining ? "Saving" : state.trainingPending ? "Recorded" : <CheckMark />}
+                </Ring>
+                <p className="status">{state.savingTraining ? "Saving training" : state.trainingPending ? "Movement recorded" : "Saved"}<small>{hint}</small></p>
               </>
             )}
           </div>

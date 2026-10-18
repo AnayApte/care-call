@@ -1,8 +1,8 @@
 import "./brand.css";
 
-export default function Brand({ view }: { view?: string }) {
+export default function Brand({ view, overlay = false }: { view?: string; overlay?: boolean }) {
   return <span className="beacon-brand">
-    <img className="beacon-mark" src="/beacon.svg" width="36" height="42" alt="" />
+    <img className="beacon-mark" src={overlay ? "/beacon-mark.svg" : "/beacon.svg"} width="36" height="42" alt="" />
     <span className="beacon-brand-copy"><span className="beacon-wordmark">BEACON</span>
       {view && <span className="beacon-view">{view}</span>}
     </span>

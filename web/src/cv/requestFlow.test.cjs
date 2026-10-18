@@ -138,3 +138,34 @@ test('failed training batch survives refresh, overrides old samples, and retries
     assert.equal(createSampleQueue('http://test', 'p_demo', storage).pendingCount(), 0);
   } finally { global.fetch = original; }
 });
+
+test('a slow training save stays pending and concurrent retries share one upload', async () => {
+  const original = global.fetch;
+  const queue = createSampleQueue('http://test', 'p_demo', memory());
+  queue.enqueue('water', Array.from({ length: 15 }, () => Array(42).fill(0)), 'config-1');
+  let finish, calls = 0;
+  global.fetch = () => { calls++; return new Promise(resolve => { finish = resolve; }); };
+  try {
+    const first = queue.flush();
+    assert.equal(queue.pendingCount(), 1);
+    assert.equal(queue.flush(), first);
+    assert.equal(calls, 1);
+    finish({ ok: true }); await first;
+    assert.equal(queue.pendingCount(), 0);
+  } finally { global.fetch = original; }
+});
+
+test('training errors explain a rejection or timeout and keep the batch for retry', async () => {
+  const original = global.fetch, storage = memory();
+  const queue = createSampleQueue('http://test', 'p_demo', storage);
+  queue.enqueue('water', Array.from({ length: 15 }, () => Array(42).fill(0)), 'config-1');
+  try {
+    global.fetch = async () => ({ ok: false, status: 422, json: async () => ({ error: 'unknown movement label' }) });
+    await assert.rejects(queue.flush(), /422.*unknown movement label/);
+    global.fetch = async () => { throw Object.assign(new Error(), { name: 'TimeoutError' }); };
+    await assert.rejects(queue.flush(), /too long/);
+    global.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    await assert.rejects(queue.flush(), /Could not reach the server/);
+    assert.equal(createSampleQueue('http://test', 'p_demo', storage).pendingCount(), 1);
+  } finally { global.fetch = original; }
+});
