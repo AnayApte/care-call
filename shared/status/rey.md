@@ -1,10 +1,11 @@
 # Status: rey
 
-Updated: 2026-10-17 ~7:50 PM
+Updated: 2026-10-17 ~8:00 PM
 
 Works:
 - `web/` scaffolded: Vite 5, React, TS, Tailwind v4 (`@tailwindcss/vite`), shadcn. `npm run dev` then http://localhost:5173/patient. Tokens in `web/src/styles/tokens.css`.
 - `/patient` onboarding (training) flow built from mockup A1 (`web/mockups/`): flashcard deck, framed camera, tap Start, 3-2-1 countdown, 3 s hold gated on steadiness, auto-retry on hand loss, check sound per label, no summary, straight into listening. Samples POST to the server per label; reload resumes at the first incomplete label; "Retrain movements" DELETEs samples and restarts.
+- Feedback loop on /patient: after a request fires, "Was that the right request?" Yes / No, then "What did they mean?". Confirmed or corrected hold frames become new samples (newest 45 per label kept) and `POST /api/requests/{id}/feedback` is sent, so the model follows the person over time and the CREAO agent gets feedback.
 - Listening view: live word, trigger ring, POST /api/requests on fire, 3 s grace after training so the last held pose does not fire.
 - Tested against Anay's server running locally: 75 samples stored, request created with source browser.
 - Hand landmarks are real (MediaPipe HandLandmarker in `web/src/lib/handTracker.ts`, same model, WASM version and contract s8 feature vector as Josh's camera.ts). Classifier (kNN k=7 vote), capture and trigger (time-based 1 s hold, 0.7 confidence, gentle drain) are stand-ins in `web/src/lib/cvMock.ts` behind the adapter `web/src/lib/cv.ts`. Add `?mock=1` to the URL for a synthetic hand (keys 0 to 4, X, S).
