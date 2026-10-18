@@ -10,11 +10,23 @@ Works:
 - Per-label limits, report versions and retraining completion have automated checks.
 - Live approved-setting updates and Help-only retraining passed in browser simulation.
 - Includes Rey's PR #18 feedback: keeps different styles and records "Nothing" without training neutral.
-- 48 JavaScript tests, five server checks, TypeScript and the web build pass.
+- Added the server CREAO adapter and caregiver report with explicit Apply and Dismiss on josh/creao-approval.
+- Refresh resumes the same review. Outdated suggestions cannot overwrite newer settings.
+- Simulated browser checks confirmed Dismiss saves nothing and Apply saves the shown settings.
+- CREAO agent created and connected locally with a private, agent-scoped key.
+- Real API run on four synthetic sessions reached the caregiver screen; explicit Apply saved Pain-only retraining.
+- Added a small summary popup and a readable full-report route on josh/report-popup.
+- Patient screen has a visible Caregiver reports link during setup and regular use.
+- Caregiver feedback uses buttons. Patient camera gestures cannot answer the caregiver's Yes/No check.
+- Removed shared-camera thumb feedback because it cannot tell the patient from the caregiver.
+- Reports survive refresh and Apply/Dismiss. Direct links without approval context are read-only.
+- Kept Rey's two-hand tracking and camera picker from PR #22 alongside Step 5.
+- 64 JavaScript tests, 16 server checks, TypeScript and the web build pass.
 - Earlier guided arm demo and browser beacon preview remain available.
 
 Next:
-- Review Step 5 with Rey and connect his live CREAO agent and approval screen.
+- Review CREAO PR #21 after Step 5 PR #15. Setup and live evidence: docs/josh-creao.md.
+- Set CREAO variables privately on the deployed server; local keys are not pushed through Git.
 - Test real camera movements together.
 - Alex: test the caregiver Pi against the same server, including its buzzer and display.
 - Anay: update the shared plan for Josh's new goal and agree a richer observation format.

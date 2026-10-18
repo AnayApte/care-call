@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import store
 from ..deps import get_patient
 from ..models import AdaptConfigIn, SampleIn
+from ..adaptation import clean_settings
 
 router = APIRouter(prefix="/api/patients")
 
@@ -32,7 +33,16 @@ def get_adapt_config(p: dict = Depends(get_patient)):
     return store.get_adapt_config(p["id"])
 
 
+@router.get("/{patient_id}/sessions")
+def session_reports(p: dict = Depends(get_patient)):
+    return store.recent_sessions(p["id"], 5)
+
+
 @router.put("/{patient_id}/adapt-config")
-def put_adapt_config(body: AdaptConfigIn, p: dict = Depends(get_patient)):
+def put_adapt_config(body: AdaptConfigIn, p: dict = Depends(get_patient),
+                     expected_version: int | None = Query(default=None, ge=1)):
     """Called only when the caregiver taps Apply."""
-    return store.set_adapt_config(p["id"], body.model_dump())
+    try:
+        return store.set_adapt_config(p["id"], clean_settings(body.model_dump(exclude_none=True)), expected_version)
+    except ValueError as exc:
+        raise HTTPException(409, "Settings changed. Refresh and request a new suggestion.") from exc

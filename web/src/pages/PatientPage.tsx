@@ -92,7 +92,7 @@ export default function PatientPage() {
             <div className="feedback" onClick={(e) => e.stopPropagation()} role="group" aria-label="Was that right">
               {feedback === "asking" ? (
                 <>
-                  <p>Was that the right request?</p>
+                  <p>Caregiver check: was that right?</p>
                   <div className="row">
                     <button type="button" className="fb yes" onClick={feedbackYes}>Yes</button>
                     <button type="button" className="fb" onClick={feedbackNo}>No</button>
@@ -119,6 +119,7 @@ export default function PatientPage() {
       {phase === "loading" && <div className="toast">Starting camera</div>}
       {USE_MOCK_HAND && <p className="toast" style={{ top: "auto", bottom: 56 }}>Simulation: 0 rest, 1 water, 2 pain, 3 help, 4 bathroom, X hide</p>}
       {toast && <div className={`toast ${toast.kind === "error" ? "error" : ""}`} role="status">{toast.text}</div>}
+      <a className="patient-caregiver-link" href="/caregiver" onClick={(e) => e.stopPropagation()}>Caregiver reports <span aria-hidden="true">↗</span></a>
     </main>
   );
 }

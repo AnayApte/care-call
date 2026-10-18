@@ -18,8 +18,10 @@ It uses Josh's configurable trigger at up to 12 observations per second,
 so approved hold settings keep the units in the shared contract. Rey's separate
 time-based trigger is unchanged.
 
-Rey owns the CREAO agent and caregiver approval screen. This code reads the
-approved-settings endpoint; it never applies an unapproved proposal.
+Josh was asked to finish the CREAO adapter and caregiver approval screen.
+Open `/caregiver` to review and explicitly Apply or Dismiss a suggestion.
+Setup: [CREAO connection](../../../docs/josh-creao.md).
+The patient code reads approved settings; it never applies an unapproved proposal.
 Confusions and false-neutral counts require explicit corrections. Predictions
 alone cannot tell us what the person meant.
 

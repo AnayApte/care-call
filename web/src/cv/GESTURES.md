@@ -60,7 +60,7 @@ match Rey's reference examples. Live webcam performance still needs testing.
 After installing the web dependencies, run these from the repo root:
 
 ```sh
-web/node_modules/.bin/tsc --target ES2022 --module commonjs --moduleResolution node --lib ES2022,DOM --strict --esModuleInterop --resolveJsonModule --skipLibCheck --rootDir . --outDir /tmp/care-call-cv-check web/src/cv/*.ts
+web/node_modules/.bin/tsc --target ES2022 --module commonjs --moduleResolution node --lib ES2022,DOM --strict --esModuleInterop --resolveJsonModule --skipLibCheck --rootDir . --outDir /tmp/care-call-cv-check web/src/cv/*.ts web/src/lib/adaptation.ts web/src/lib/reports.ts
 CV_TEST_BUILD=/tmp/care-call-cv-check/web/src/cv node --test web/src/cv/*.test.cjs
 ```
 

@@ -72,6 +72,11 @@
   color: #fff; background: rgba(0, 0, 0, 0.25); font-size: 16px; cursor: pointer; backdrop-filter: blur(6px); }
 .btn-retrain:hover { background: rgba(0, 0, 0, 0.4); }
 
+.patient-caregiver-link { position: absolute; right: calc(var(--frame-inset) + 16px); bottom: calc(var(--frame-inset) + 16px); z-index: 10;
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border: 1px solid var(--paper-3); border-radius: 999px;
+  background: var(--paper); color: var(--ink); font-size: 16px; font-weight: 600; text-decoration: none; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15); }
+.patient-caregiver-link:hover { background: var(--pine-soft); }
+
 .cam-select { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 6px 0 14px;
   border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.25); color: #fff; backdrop-filter: blur(6px);
   opacity: 0.7; transition: opacity var(--duration-fast), background var(--duration-fast); }
