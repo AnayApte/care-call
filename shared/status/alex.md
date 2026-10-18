@@ -12,8 +12,9 @@ Works:
 - Built the web frontend against the live API, copied it to the Pi and started the local server on 127.0.0.1:5173. Verified `/patient` serves HTML, and the Pi can read live health and Maria API endpoints.
 
 Blocked / need:
-- Epiphany launch over SSH failed because the SSH session lacks the active VNC display and D-Bus. Launch the browser from a terminal inside the active VNC desktop.
+- Epiphany does not launch in the QNX VNC desktop: the Pi has no X display (`cannot open display`) and no QNX Screen compatible browser was found in its package repository. The static site is reachable from the Pi; the browser window itself is not available in this VNC image.
 
 Next:
-- In a VNC desktop terminal, run `epiphany --new-window http://127.0.0.1:5173/patient`. To show the native camera/model preview, run `cd ~/care-call && .venv/bin/python3 edge/bedside/vision.py --camera-unit 5 --display`.
+- From a Mac, an SSH tunnel can display the Pi-hosted frontend in the Mac browser: `ssh -fN -o ExitOnForwardFailure=yes -L 15173:127.0.0.1:5173 qnxuser@172.20.10.2 && open http://127.0.0.1:15173/patient`. This appears on the Mac desktop; opening the browser inside VNC requires a QNX image with a supported graphical browser.
+- To show the native camera/model preview, run `cd ~/care-call && .venv/bin/python3 edge/bedside/vision.py --camera-unit 5 --display` from a QNX graphical session with an OpenCV display backend.
 - The native preview reports generic pose classes from the baseline. It does not yet load personalized request meanings or post requests.
