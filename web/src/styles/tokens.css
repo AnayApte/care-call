@@ -1,0 +1,31 @@
+/* Design tokens. Warm clinical: paper, ink, pine. Calm, high contrast, big type. */
+:root {
+  --paper: #f4efe4;
+  --paper-2: #e9e3d6;
+  --paper-3: #dcd4c2;
+  --ink: #1b1f1d;
+  --mute: #6b7370;
+  --pine: #1f6f5b;
+  --pine-soft: #cfe3dc;
+  --signal: #d8a24a;
+  --alert: #b3412f;
+  --ring-track: rgba(243, 239, 231, 0.35);
+
+  --font-sans: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --text-hint: 1.0625rem;
+  --text-body: 1.5rem;
+  --text-status: 1.5rem;
+  --text-word: clamp(5rem, 9.5vw, 7.75rem);
+  --text-word-live: clamp(6rem, 11vw, 8.75rem);
+
+  --frame-inset: 28px;
+  --frame-radius: 22px;
+  --card-w: 560px;
+  --card-h: 372px;
+
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-lift: 420ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
