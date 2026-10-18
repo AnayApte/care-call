@@ -45,7 +45,8 @@ export default function PatientPage() {
   return (
     <main className="patient-design relative h-full overflow-hidden">
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
-        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
+        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" hidden={cameraId === "pi-usb"} />
+        {cameraId === "pi-usb" && <img className="pi-cam-preview" src="/camera.mjpg" alt="Pi USB camera preview" />}
         <HandCanvas ref={canvasRef} />
       </div>
       <div className="patient-toolbar">

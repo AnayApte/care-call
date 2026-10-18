@@ -106,3 +106,7 @@ An isolated browser test rejected synthetic uploads, kept them and saved them af
 Retry. It used ports 5182/8011, not the webcam or real database. Test services closed.
 67 CV checks, typecheck, changed-file lint and build pass. Removed the logo box
 only on the patient page; caregiver branding keeps its original treatment.
+
+Synced Alex's Pi camera PR #34. Production still uses the Pi USB stream. The local
+Vite demo defaults to the laptop webcam and offers Pi input separately, so a local
+training check does not require the Pi's /camera.mjpg server.

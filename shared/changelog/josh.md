@@ -51,3 +51,5 @@
 2026-10-18 | Renamed the web app Beacon and added a lighthouse logo. Removed browser audio and its controls so the external speaker handles sound. Kept saved data and device code unchanged. 65 CV checks, typecheck, lint and build pass. Training-save error still under investigation.
 
 2026-10-18 | Fixed misleading training-save status and retained failure details for retry. An isolated synthetic browser check passed failure and retry; the local server already has 75 recordings. The original webcam-save failure was not reproduced. Removed the patient logo box only. 67 CV checks, typecheck, lint and build pass.
+
+2026-10-18 | Synced Alex's Pi camera work and kept his hardware files unchanged. Local development can use the laptop webcam; production keeps the Pi input. Kept both shared contract notes when merging main.
