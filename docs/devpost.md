@@ -46,11 +46,11 @@ Assistive prototype, not a medical device. Synthetic patient only.
 
 ## Accomplishments that we're proud of
 
-- Hand movement in a browser becomes a spoken request, a buzzing red Pi, a button press, and "Help is coming." End to end, live.
-- A personal classifier that needs 15 samples and transfers to gestures the base model never saw.
-- Three escalation channels, each independently cuttable, all cancelled by the first ack.
-- An agent that can help but can't harm: human in the loop, hard clamps on every value.
-- A contract document written before any code: JSON shapes, every route, folder ownership. Four people, zero merge conflicts.
+- **It works, end to end, live.** A small hand movement in front of a Raspberry Pi becomes a spoken request, a buzzing red light on the caregiver's unit, a button press, and the words "Help is coming" back at the bedside.
+- **It learns each person in under a minute.** Fifteen examples of a movement are enough, and it recognises movements that the underlying model had never seen during training.
+- **Nobody gets left waiting.** Voice, then text, then a phone call, and the first answer from any of them stops the rest. Each layer can be switched off without breaking the others.
+- **The AI can help but cannot harm.** Its suggestions go to a human first, and every setting it proposes is kept within a safe range.
+- **Four people, one weekend, no stepping on each other.** We agreed on how every piece would talk to every other piece before writing code, so each of us could build our part alone and have it fit.
 
 ## What we learned
 
