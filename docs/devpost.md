@@ -22,15 +22,15 @@ Assistive prototype, not a medical device. Synthetic patient only.
 
 ## How we built it
 
-**A frozen embedding, not a per-patient model.** MediaPipe gives 21 hand landmarks. A small network we trained on 1.05 million hand images turns them into a 32-number "hand shape" embedding. A k-nearest-neighbour classifier over the patient's own 15 samples per word does the rest. A new word or new patient is 15 samples. No retraining.
+**Recognising the movement.** The camera tracks 21 points on the hand, like a tiny skeleton. We trained a small model on about a million hand images, not to recognise any particular gesture, but to describe the overall shape of a hand as a short list of numbers. When a patient records 15 examples of a movement, we store those descriptions. From then on, each new frame is compared to the stored ones, and the closest match wins. Adding a new word, or a new patient, is just 15 more examples. The model itself never changes.
 
-**Dumb plumbing.** One FastAPI server on Railway is the only thing anyone talks to. Both Pis poll it once a second over HTTPS. No websockets, nothing device-to-device.
+**Connecting everything.** The browser, the caregiver unit and the bedside unit never talk to each other directly. They all talk to one server in the cloud. The two Raspberry Pis simply ask it "anything new?" once a second. It is the simplest design that could work, and it survived the venue Wi-Fi.
 
-**Escalation that cancels cleanly.** Voice at 0 s, iMessage at 20, call at 75, each step exactly once, all stopped by an ack from any channel. ElevenLabs audio is pre-generated so the bedside never waits. Photon handles iMessage through a Node sidecar. Gemini answers the caregiver's free-text questions with the day's requests as context.
+**Making sure someone answers.** When a request fires, the bedside speaks it immediately. If nobody has pressed the button after 20 seconds, the caregiver gets an iMessage with a tap-to-answer poll. After 75 seconds, a phone call. Each step happens once, and the moment anyone answers, through any channel, the rest is cancelled. The spoken phrases come from ElevenLabs and are generated ahead of time so the bedside never pauses. Photon delivers the iMessages, and if the caregiver texts back a question like "what did she ask for today?", Gemini answers it using the day's request history.
 
-**Safe adaptation.** A CREAO agent proposes settings from session summaries. Every value is clamped in the browser, so a bad output can't break the trigger.
+**Adapting to the person.** Every session, the app notes which words fired cleanly, which were abandoned, and which got mixed up. A CREAO agent reads those notes and suggests adjustments in plain words, such as "pain was confused with help four times, try a longer hold." The caregiver sees the suggestion and chooses to apply it or not. Any value the agent proposes is capped to a safe range, so even a bad suggestion cannot break the system.
 
-**Sentry** traces every request from creation to acknowledgement, with ack latency as a tag.
+**Watching it run.** Sentry records every request from the moment it fires to the moment it is acknowledged, including how long the caregiver took to answer.
 
 ## Challenges we ran into
 
