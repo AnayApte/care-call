@@ -15,3 +15,5 @@
 2026-10-17 | Pulled Rey's larger version 2 model, checked browser compatibility and added a model version label. All 29 JavaScript tests pass. Arm check unchanged.
 
 2026-10-17 | Connected step 4 to Rey's patient screen. Added real gesture recognition, training check and honest send status. Simulated training, Water request, device alert and failed send checked. 33 JavaScript tests, two server checks and web build pass. Live camera and hardware still need testing.
+
+2026-10-17 | Synced with main before merging step 4. Updated device wording for the team's switch to Raspberry Pi. Server alert checks still pass.

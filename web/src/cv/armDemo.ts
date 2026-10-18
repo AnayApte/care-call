@@ -50,7 +50,7 @@ async function refreshAlert() {
     const online = await current.deviceOnline().catch(() => null);
     if (current !== alert) return;
     el("alert-status").textContent = state.message;
-    el("device-status").textContent = online === null ? "Device status unavailable." : online ? "A device heartbeat is recent. Physical sound/display not verified." : "No recent device heartbeat. The ESP32 may be offline.";
+    el("device-status").textContent = online === null ? "Device status unavailable." : online ? "A device heartbeat is recent. Physical sound/display not verified." : "No recent device heartbeat. The caregiver device may be offline.";
     if (state.request?.status === "acked") { lockServer(false); return; }
   } catch {
     if (current === alert) el("alert-status").textContent = "Could not refresh acknowledgement. HELP may still be open; check the server.";

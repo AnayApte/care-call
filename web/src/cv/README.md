@@ -14,10 +14,10 @@ To test without a camera, click **Run simulated arm drop**.
 ## Connect the hardware
 
 Enter the Care Call server URL and enable **Send HELP** before starting.
-The page sends one HELP request. Alex's ESP32 polls that server and alerts.
+The page sends one HELP request. Alex's caregiver Pi polls that server and alerts.
 The page then watches for acknowledgement. It also shows whether a device
 heartbeat is recent. A server receipt does not prove the buzzer sounded.
-Localhost works only on the laptop. The real ESP32 needs a public HTTPS server
+Localhost works only on the laptop. The caregiver Pi needs a public HTTPS server
 that both the browser and device can reach.
 
 `beaconPreview.html` is a browser preview for testing the same alert flow.

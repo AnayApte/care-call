@@ -12,7 +12,7 @@ Works:
 
 Next:
 - Review the patient integration PR with Rey, then test real camera movements together.
-- Alex: run the ESP32 firmware against the same server and test its buzzer/display.
+- Alex: test the caregiver Pi against the same server, including its buzzer and display.
 - Anay: update the shared plan for Josh's new goal and agree a richer observation format.
 
 Arm thresholds are unvalidated demo settings. This cannot diagnose or rule out stroke.
