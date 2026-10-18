@@ -140,10 +140,30 @@ def record_heartbeat(device_id: str, rssi: Optional[int]) -> None:
                      " rssi=excluded.rssi", (device_id, time.time(), rssi))
 
 
-def last_heartbeat_age_s() -> Optional[float]:
+def last_heartbeat_age_s(device_id: Optional[str] = None) -> Optional[float]:
+    """Seconds since the last heartbeat from `device_id`, or from any device if None."""
     with db.connect() as conn:
-        row = conn.execute("SELECT MAX(last_heartbeat_at) AS t FROM devices").fetchone()
+        row = conn.execute("SELECT MAX(last_heartbeat_at) AS t FROM devices WHERE ? IS NULL OR device_id=?",
+                           (device_id, device_id)).fetchone()
     return None if row["t"] is None else time.time() - row["t"]
+
+
+def device_heartbeats() -> dict[str, float]:
+    """device_id -> seconds since its last heartbeat."""
+    with db.connect() as conn:
+        rows = conn.execute("SELECT device_id, last_heartbeat_at FROM devices"
+                            " WHERE last_heartbeat_at IS NOT NULL").fetchall()
+    return {r["device_id"]: round(time.time() - r["last_heartbeat_at"], 1) for r in rows}
+
+
+def last_ack(window_s: float) -> Optional[dict]:
+    """The most recent ack in the last `window_s` seconds, for the bedside "Help is coming"."""
+    with db.connect() as conn:
+        row = conn.execute("SELECT * FROM requests WHERE status='acked' ORDER BY acked_at DESC LIMIT 1").fetchone()
+    if not row or (datetime.now(timezone.utc) - parse_iso(row["acked_at"])).total_seconds() > window_s:
+        return None
+    return {"request_id": f"r_{row['n']}", "display": row["display"],
+            "acked_at": row["acked_at"], "acked_by": row["acked_by"]}
 
 
 def device_state(device_id: str) -> dict:
@@ -153,17 +173,18 @@ def device_state(device_id: str) -> dict:
         acked = None
         if dev and dev["acked_until"] and dev["acked_until"] > time.time():
             acked = conn.execute("SELECT * FROM requests WHERE n=?", (dev["acked_request_n"],)).fetchone()
+    recent = last_ack(config.LAST_ACK_WINDOW_S)
     if acked:
         return {"device_id": device_id, "mode": "acked",
                 "active_request": {"id": f"r_{acked['n']}", "display": acked["display"],
                                    "created_at": acked["created_at"]},
-                "message": config.ACKED_MESSAGE}
+                "message": config.ACKED_MESSAGE, "last_ack": recent}
     req = latest_open_request()
     if req:
         return {"device_id": device_id, "mode": "alert",
                 "active_request": {"id": req["id"], "display": req["display"], "created_at": req["created_at"]},
-                "message": None}
-    return {"device_id": device_id, "mode": "idle", "active_request": None, "message": None}
+                "message": None, "last_ack": recent}
+    return {"device_id": device_id, "mode": "idle", "active_request": None, "message": None, "last_ack": recent}
 
 
 # CV session summaries (contract section 19)
