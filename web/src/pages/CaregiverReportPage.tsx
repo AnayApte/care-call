@@ -72,7 +72,7 @@ export default function CaregiverReportPage({ reportId }: { reportId: string }) 
 
   return <main className="caregiver"><div className="report-page">
     <header className="cg-header"><a className="cg-brand" href="/caregiver">Care Call <span> / report</span></a><a href="/caregiver"><ArrowLeft size={14} className="inline" /> Back to caregiver</a></header>
-    <div className="report-page-heading"><p className="cg-eyebrow">THE FULL PICTURE</p><h1>{summary?.title ?? "Your practice review"}</h1><p>CREAO’s explanation, suggested settings, and your choice. Maria’s demo profile.</p></div>
+    <div className="report-page-heading"><p className="cg-eyebrow">DETAILED REPORT</p><h1>{summary?.title ?? "Your practice review"}</h1><p>CREAO’s explanation and suggested settings for this demo profile.</p></div>
     {error && <p className="cg-message cg-error" role="alert">{error} <button className="report-inline-link" onClick={() => { setError(""); setLoading(!report); setRetry(n => n + 1); }}>Try again</button></p>}
     {notice && <p className="cg-message" role="status">{notice}</p>}
     {loading && <p role="status">Loading the report… This reopens the same run.</p>}

@@ -22,6 +22,6 @@ export default function ReportSummary({ report, open, onClose }: { report: Saved
     <div className="report-reassurance"><span className="report-dot" />{report.outcome === "applied" ? "These settings have been applied." : report.outcome === "dismissed" ? "Dismissed. Your settings stayed the same." : report.outcome === "readonly" ? "Reading this report does not change your settings." : "Your settings stay the same until you approve."}</div>
     <a className="cg-button report-full-link" href={reportPath(report.id)}>Read full report <ArrowUpRight size={17} /></a>
     <button className="report-later" onClick={onClose}>Close for now</button>
-    <p className="report-popup-footnote">Reviewed by CREAO · Maria’s demo profile</p>
+    <p className="report-popup-footnote">Reviewed by CREAO · Demo profile</p>
   </dialog>;
 }

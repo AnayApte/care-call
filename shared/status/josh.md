@@ -75,3 +75,7 @@ The review button is enabled. No new paid run was started; this is a setup check
 Synced Rey's custom-word update from main; usage includes added words too.
 64 CV checks, 15 hand/word checks, 26 server checks, typecheck, changed-file lint
 and build pass.
+
+Caregiver text (2026-10-18): replaced the slogan with "Caregiver dashboard" and
+hard-coded Maria labels with "patient" or "demo profile", including report views.
+Verified the dashboard and popup in the browser. Typecheck, changed-file lint and build pass.

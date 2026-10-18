@@ -14,20 +14,20 @@ function RequestCard({ request, online, vote, onAck, onFeedback, busy }: {
   const [correcting, setCorrecting] = useState(false);
   const [skipped, setSkipped] = useState(false);
   return <article className={`request-card ${request.status === "open" ? "request-open" : "request-answered"}`}>
-    <div className="request-top"><div><p className="cg-eyebrow">{request.status === "open" ? "MARIA NEEDS" : "ANSWERED"}</p><h3>{request.display}</h3></div>
+    <div className="request-top"><div><p className="cg-eyebrow">{request.status === "open" ? "PATIENT REQUEST" : "ANSWERED"}</p><h3>{request.display}</h3></div>
       <time dateTime={request.created_at}>{new Date(request.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></div>
     <p>{request.speech}</p>
     {request.status === "open" ? <button type="button" className="cg-button request-ack" disabled={!online || busy} onClick={onAck}>{busy ? "Sending…" : "I’m coming"}</button>
       : <p className="request-confirmation">Help is on the way · answered {new Date(request.acked_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
     <details className="request-feedback"><summary>Optional: was this understood correctly?</summary>
-      <p>Only answer if you know what Maria intended. This does not delay help or change her learned movements.</p>
+      <p>Only answer if you know what the patient intended. This does not delay help or change recorded movements.</p>
       {vote ? <p role="status">Saved: {vote.correct ? "Correct" : `Incorrect${vote.intended_label ? ` — intended ${vote.intended_label === "neutral" ? "nothing" : vote.intended_label}` : ""}`}.</p>
         : skipped ? <p role="status">Not sure. No feedback or training change was sent.</p>
         : <div className="request-feedback-actions">
           <button className="cg-button cg-secondary" disabled={!online || busy} onClick={() => { void onFeedback(true, request.label); }}>Correct</button>
           <button className="cg-button cg-secondary" disabled={!online || busy} onClick={() => setCorrecting(true)}>Incorrect</button>
           <button className="cg-button cg-secondary" onClick={() => setSkipped(true)}>Not sure</button>
-          {correcting && <div><p>What did Maria mean?</p>{REQUEST_LABELS.filter(label => label !== request.label).map(label =>
+          {correcting && <div><p>What did the patient mean?</p>{REQUEST_LABELS.filter(label => label !== request.label).map(label =>
             <button key={label} className="cg-button cg-secondary" disabled={!online || busy} onClick={() => { void onFeedback(false, label); }}>{DISPLAY_WORD[label as Label]}</button>)}
             <button className="cg-button cg-secondary" disabled={!online || busy} onClick={() => { void onFeedback(false, "neutral"); }}>Nothing intended</button>
             <button className="cg-button cg-secondary" disabled={!online || busy} onClick={() => { void onFeedback(false); }}>I don’t know the word</button></div>}
@@ -88,7 +88,7 @@ export default function RequestInbox({ beacon = false }: { beacon?: boolean }) {
   const history = requests.filter(r => r.status === "acked");
   const answered = history.slice(0, historyLimit);
   return <section className={`request-inbox ${beacon ? "beacon-inbox" : ""}`} aria-label="Live requests">
-    <div className="request-heading"><div><p className="cg-eyebrow">LIVE REQUESTS</p><h2>{open.length ? `${open.length} waiting for help` : "Ready when Maria needs you"}</h2></div>
+    <div className="request-heading"><div><p className="cg-eyebrow">LIVE REQUESTS</p><h2>{open.length ? `${open.length} waiting for help` : "Waiting for requests"}</h2></div>
       <button className="cg-button cg-secondary" onClick={() => { sounds.unlock(); soundRef.current = !soundRef.current; setSound(soundRef.current); }}>{sound ? "Mute alerts" : "Enable alert sound"}</button></div>
     <p className={`connection ${online ? "connected" : "disconnected"}`} role="status">{!loaded ? "Connecting…" : online ? "Connected · checking every second" : "Connection lost · requests may be out of date"}{lastUpdate && ` · last update ${lastUpdate.toLocaleTimeString()}`}</p>
     {error && <p className="cg-message cg-error" role="alert">{error}</p>}
@@ -101,7 +101,7 @@ export default function RequestInbox({ beacon = false }: { beacon?: boolean }) {
         await client.feedback(request.id, correct, intended);
         setVotes(rows => [...rows.filter(v => v.request_id !== request.id), { request_id: request.id, correct, intended_label: intended ?? null }]);
       })} />)}</div>
-    {loaded && !requests.length && <p>No requests yet. Keep this page open while Maria uses the patient screen.</p>}
+    {loaded && !requests.length && <p>No requests yet. Keep this page open while the patient uses their screen.</p>}
     {history.length > historyLimit && <button className="cg-button cg-secondary" onClick={() => setHistoryLimit(n => n + 5)}>Show more answered requests</button>}
   </section>;
 }
