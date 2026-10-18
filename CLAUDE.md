@@ -1,6 +1,6 @@
 # Instructions for Claude Code
 
-Read `shared/contract.md` in full before doing anything. It is the single source of truth. Then read `agents/<your-human>.md` for your role, folders and first tasks.
+Read `shared/contract.md` in full, then `shared/contract-v2.md` for the current software-completion phase and hardware handoff. V2 governs that phase; v1 remains the base for unchanged interfaces, stack and folder ownership. Then read `agents/<your-human>.md` for your role.
 
 Schedule: we started at 3 PM Saturday. Push to your branch and merge a small PR to `main` every hour on the hour until the 12:30 AM freeze. Final code freeze is 8 AM Sunday.
 
