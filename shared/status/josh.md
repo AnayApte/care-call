@@ -110,3 +110,9 @@ only on the patient page; caregiver branding keeps its original treatment.
 Synced Alex's Pi camera PR #34. Production still uses the Pi USB stream. The local
 Vite demo defaults to the laptop webcam and offers Pi input separately, so a local
 training check does not require the Pi's /camera.mjpg server.
+
+Demo prep (2026-10-18): added docs/josh-demo-qna.md against main 28c4f5c.
+Includes architecture, plain interview answers, Josh's role and honest limits.
+Distinguishes browser recognition from Pi camera input, personal examples from
+neural-network training, and recorded tests from deployment or patient accuracy.
+Documentation only; no application or hardware changes.
