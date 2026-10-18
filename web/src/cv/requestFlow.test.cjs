@@ -124,3 +124,39 @@ test('failed training batch survives refresh, overrides old samples, and retries
     assert.equal(createSampleQueue('http://test', 'p_demo', storage).pendingCount(), 0);
   } finally { global.fetch = original; }
 });
+
+test('demo continue acks an open request and returns to ready at once', async () => {
+  const t = setup(); release(t, 1000);
+  const acks = [];
+  t.client.ack = async id => { acks.push(id); return { id, label: 'water', status: 'acked', speech: 'Water please' }; };
+  await t.flow.fire('water', .9);
+  assert.equal(t.flow.snapshot().phase, 'waiting_ack');
+  assert.deepEqual(await t.flow.skip(), { skipped: true });
+  assert.deepEqual(acks, ['r_1']);
+  assert.equal(t.flow.snapshot().phase, 'ready');
+  assert.equal(t.flow.snapshot().input, null);
+  assert.equal(setup(t.storage).flow.snapshot().input, null);
+  t.observe(rest, 1800);
+  assert.equal(t.flow.snapshot().phase, 'ready');
+});
+
+test('demo continue skips the ack call once a caregiver has answered, and is ignored while sending', async () => {
+  const t = setup(); release(t, 1000);
+  const acks = [];
+  t.client.ack = async id => { acks.push(id); };
+  assert.deepEqual(await t.flow.skip(), { skipped: false });
+  await t.flow.fire('water', .9);
+  t.ack(); await t.flow.poll();
+  assert.equal(t.flow.snapshot().phase, 'acknowledged');
+  assert.deepEqual(await t.flow.skip(), { skipped: true });
+  assert.deepEqual(acks, []);
+  assert.equal(t.flow.snapshot().phase, 'ready');
+});
+
+test('demo continue still returns to ready when the ack call fails, and reports it', async () => {
+  const t = setup(); release(t, 1000);
+  t.client.ack = async () => { throw new RequestError('Cannot reach the server.'); };
+  await t.flow.fire('water', .9);
+  assert.deepEqual(await t.flow.skip(), { skipped: true, ackError: 'Cannot reach the server.' });
+  assert.equal(t.flow.snapshot().phase, 'ready');
+});

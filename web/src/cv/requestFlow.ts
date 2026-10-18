@@ -109,6 +109,20 @@ export function createRequestFlow(client: ReturnType<typeof createRequestsClient
       saved = null; persist(); releaseSince = null;
       update({ phase: "ready", input: null, request: null, error: "" });
     },
+    /** Demo "continue": acks a still-open request (stops escalation), then listens again without the relax step. */
+    async skip(): Promise<{ skipped: boolean; ackError?: string }> {
+      const current = saved?.request;
+      if (!current || !["waiting_ack", "acknowledged", "waiting_release"].includes(state.phase)) return { skipped: false };
+      let ackError: string | undefined;
+      if (current.status === "open") {
+        try { await client.ack(current.id); }
+        catch (e) { ackError = e instanceof Error ? e.message : "Could not mark the request handled."; }
+      }
+      if (saved?.request?.id !== current.id) return { skipped: false };
+      saved = null; persist(); releaseSince = null; lastFrame = -Infinity;
+      update({ phase: "ready", input: null, request: null, error: "" });
+      return ackError ? { skipped: true, ackError } : { skipped: true };
+    },
     recoverFailed() {
       // Only a definite rejection can be set aside. An uncertain delivery keeps its retry key.
       if (state.phase !== "failed") return;

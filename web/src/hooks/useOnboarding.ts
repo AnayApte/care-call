@@ -357,6 +357,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       () => toast("Usage report not sent. It is kept for retry.", "error"));
   }, [reports, toast]);
 
+  // Bumping this restarts the camera only; the hand model stays loaded.
+  const [cameraAttempt, setCameraAttempt] = useState(0);
+  const reloadCamera = useCallback(() => setCameraAttempt((n) => n + 1), []);
+
   // Camera and frame loop.
   useEffect(() => {
     const video = videoRef.current;
@@ -375,7 +379,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
     return () => { cancelled = true; controller.abort(); stop?.(); trigger.reset(); };
-  }, [videoRef, onFrame, toast, cameraId, patch, flow]);
+  }, [videoRef, onFrame, toast, cameraId, cameraAttempt, patch, flow]);
 
   useEffect(() => () => { session.current.timers.forEach((id) => window.clearTimeout(id)); }, []);
 
@@ -406,6 +410,16 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   }, [flow, patch, setPhase]);
   useEffect(() => () => speech.stop(), [speech]);
   const dismiss = useCallback(() => flow.recoverFailed(), [flow]);
+  /** Demo tap or Space: marks the request handled and goes straight back to Ready. */
+  const continueDemo = useCallback(async () => {
+    const { skipped, ackError } = await flow.skip();
+    if (!skipped) return;
+    const s = session.current;
+    s.trigger.reset();
+    s.triggerState = idleTrigger;
+    patch({ trigger: idleTrigger, feedback: null });
+    if (ackError) toast(`Back to Ready, but the caregiver unit may still show it: ${ackError}`, "error");
+  }, [flow, patch, toast]);
 
   /** Save an explicit correctness vote. Guided recording changes personal samples. */
   const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
@@ -497,7 +511,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     setPhase("listening", { canSkip: false, lifting: null, progress: 0, trigger: idleTrigger, toast: null });
   }, [setPhase, flow]);
 
-  return { state, start: startCountdown, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect,
+  return { state, start: startCountdown, retrain, reloadCamera, dismiss, continueDemo, feedbackYes, feedbackNo, feedbackCorrect,
     feedbackSkip: () => patch({ feedback: "done" }), retryRequest: flow.retry, checkRequest: flow.poll,
     enableSound: async () => {
       await speech.enable();
