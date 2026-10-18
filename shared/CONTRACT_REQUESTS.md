@@ -32,3 +32,7 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 2026-10-18 | josh | Josh requested live usage and the CREAO connection. Added PUT /api/patients/{id}/live-session and GET /api/patients/{id}/usage for ongoing counts; closed reports keep their retry rules. Explicit CREAO reviews read the latest saved or ongoing windows. Web/server edits are included for this request; no new libraries or automatic agent runs.
 
 2026-10-18 | josh | Josh requested plain caregiver text without Maria or the slogan. Updated the dashboard, request inbox and report labels for this request.
+
+2026-10-18 | josh | Josh requested a dashboard redesign inspired by Hello from Here. Updated the caregiver layout, request history and report styling on josh/dashboard-design. This request authorizes these web edits.
+
+2026-10-18 | josh | Josh also requested matching patient fonts and buttons, with Caregiver screen at the top. Added patient styling and grouped its controls; camera and gesture logic are unchanged.

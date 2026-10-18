@@ -45,3 +45,5 @@
 2026-10-18 | Added automatic usage updates, including ongoing practice and custom words. Saved reports do not double-count the live window. Browser counts updated without Refresh. Synced Rey's new words from main. Enabled the local server's existing CREAO setup; no paid run started. 105 checks, typecheck, lint and build pass.
 
 2026-10-18 | Replaced the caregiver slogan with "Caregiver dashboard" and removed Maria from dashboard and report labels. Browser check, typecheck, lint and build pass.
+
+2026-10-18 | Redesigned the caregiver dashboard with Hello from Here's black grid and geometric style. Waiting requests stay prominent; answered requests move into history. Matched reports and patient controls, with Caregiver screen at the top right. Live preview, phone/tablet styles and report navigation checked; typecheck, lint and build pass.

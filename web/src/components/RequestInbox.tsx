@@ -87,12 +87,7 @@ export default function RequestInbox({ beacon = false }: { beacon?: boolean }) {
   const open = requests.filter(r => r.status === "open");
   const history = requests.filter(r => r.status === "acked");
   const answered = history.slice(0, historyLimit);
-  return <section className={`request-inbox ${beacon ? "beacon-inbox" : ""}`} aria-label="Live requests">
-    <div className="request-heading"><div><p className="cg-eyebrow">LIVE REQUESTS</p><h2>{open.length ? `${open.length} waiting for help` : "Waiting for requests"}</h2></div>
-      <button className="cg-button cg-secondary" onClick={() => { sounds.unlock(); soundRef.current = !soundRef.current; setSound(soundRef.current); }}>{sound ? "Mute alerts" : "Enable alert sound"}</button></div>
-    <p className={`connection ${online ? "connected" : "disconnected"}`} role="status">{!loaded ? "Connecting…" : online ? "Connected · checking every second" : "Connection lost · requests may be out of date"}{lastUpdate && ` · last update ${lastUpdate.toLocaleTimeString()}`}</p>
-    {error && <p className="cg-message cg-error" role="alert">{error}</p>}
-    <div className="request-list">{[...open, ...answered].map(request => <RequestCard key={request.id} request={request} online={online} busy={busy.includes(request.id)} vote={votes.find(v => v.request_id === request.id)}
+  const renderRequest = (request: CareRequest) => <RequestCard key={request.id} request={request} online={online} busy={busy.includes(request.id)} vote={votes.find(v => v.request_id === request.id)}
       onAck={() => { void act(request.id, async () => {
         const saved = await client.ack(request.id);
         setRequests(rows => rows.map(r => r.id === saved.id ? saved : r));
@@ -100,8 +95,18 @@ export default function RequestInbox({ beacon = false }: { beacon?: boolean }) {
       onFeedback={(correct, intended) => act(request.id, async () => {
         await client.feedback(request.id, correct, intended);
         setVotes(rows => [...rows.filter(v => v.request_id !== request.id), { request_id: request.id, correct, intended_label: intended ?? null }]);
-      })} />)}</div>
+      })} />;
+  return <section id={beacon ? undefined : "requests"} className={`request-inbox ${beacon ? "beacon-inbox" : ""}`} aria-label="Live requests">
+    <div className="request-heading"><div><p className="cg-eyebrow">{beacon ? "LIVE REQUESTS" : "01 / LIVE REQUESTS"}</p><h2>{open.length ? `${open.length} waiting for help` : "Waiting for requests"}</h2></div>
+      <div className="request-tools">{!beacon && <div className="request-count"><strong>{String(open.length).padStart(2, "0")}</strong><span>WAITING</span></div>}
+        <button className="cg-button cg-secondary" onClick={() => { sounds.unlock(); soundRef.current = !soundRef.current; setSound(soundRef.current); }}>{sound ? "Mute alerts" : "Enable alert sound"}</button></div></div>
+    <p className={`connection ${online ? "connected" : "disconnected"}`} role="status">{!loaded ? "Connecting…" : online ? "Connected · checking every second" : "Connection lost · requests may be out of date"}{lastUpdate && ` · last update ${lastUpdate.toLocaleTimeString()}`}</p>
+    {error && <p className="cg-message cg-error" role="alert">{error}</p>}
+    <div className="request-list">{(beacon ? [...open, ...answered] : open).map(renderRequest)}</div>
+    {!beacon && loaded && requests.length > 0 && !open.length && <div className="request-empty"><span className="request-idle-mark" aria-hidden="true">＋</span><p>{online ? "All requests answered." : "Showing the last received requests."}<span>{online ? "New requests will appear here automatically." : "Reconnecting to check for new requests."}</span></p></div>}
     {loaded && !requests.length && <p>No requests yet. Keep this page open while the patient uses their screen.</p>}
-    {history.length > historyLimit && <button className="cg-button cg-secondary" onClick={() => setHistoryLimit(n => n + 5)}>Show more answered requests</button>}
+    {!beacon && history.length > 0 && <details className="request-history"><summary><span>Answered requests</span><span>{String(history.length).padStart(2, "0")} <span aria-hidden="true">↗</span></span></summary><div className="request-list">{answered.map(renderRequest)}</div>
+      {history.length > historyLimit && <button className="cg-button cg-secondary" onClick={() => setHistoryLimit(n => n + 5)}>Show more answered requests</button>}</details>}
+    {beacon && history.length > historyLimit && <button className="cg-button cg-secondary" onClick={() => setHistoryLimit(n => n + 5)}>Show more answered requests</button>}
   </section>;
 }
