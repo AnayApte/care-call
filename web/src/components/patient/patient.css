@@ -72,6 +72,16 @@
   color: #fff; background: rgba(0, 0, 0, 0.25); font-size: 16px; cursor: pointer; backdrop-filter: blur(6px); }
 .btn-retrain:hover { background: rgba(0, 0, 0, 0.4); }
 
+.cam-select { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 6px 0 14px;
+  border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.25); color: #fff; backdrop-filter: blur(6px);
+  opacity: 0.7; transition: opacity var(--duration-fast), background var(--duration-fast); }
+.cam-select:hover, .cam-select:focus-within { opacity: 1; background: rgba(0, 0, 0, 0.45); }
+.cam-select:focus-within { outline: 2px solid var(--pine-soft); outline-offset: 2px; }
+.cam-select svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.cam-select select { max-width: 220px; height: 100%; padding-right: 8px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 15px;
+  text-overflow: ellipsis; cursor: pointer; outline: none; }
+.cam-select option { color: var(--ink); }
+
 .live-word { color: #fff; font-size: min(var(--text-word-live), 18vh); font-weight: 700; letter-spacing: -0.02em; position: absolute; left: 72px; bottom: 160px; margin: 0; line-height: 1;
   text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
 .live-word.result { color: var(--pine-soft); }
