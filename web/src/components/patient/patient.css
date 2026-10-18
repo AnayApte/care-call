@@ -3,6 +3,7 @@
   border: 3px solid rgba(27, 31, 29, 0.85); box-shadow: inset 0 0 0 2px rgba(243, 239, 231, 0.6); background: #2c2d2b; }
 .cam-frame video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
   background: transparent; }
+.cam-frame .pi-cam-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 /* Keep effects off the live video surface; shade it with a separate layer. */
 .cam-frame::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: rgba(0, 0, 0, .18); transition: background var(--duration-normal); }
 .cam-frame.dim::after { background: rgba(0, 0, 0, .45); }

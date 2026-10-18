@@ -36,6 +36,7 @@ export async function startRealHandTracker(
   arbiter: HandArbiter = createHandArbiter(),
 ): Promise<() => void> {
   let stream: MediaStream | null = null;
+  let piImage: HTMLImageElement | null = null;
   let detector: HandLandmarker | null = null;
   let stopped = false;
   let raf = 0;
@@ -46,6 +47,7 @@ export async function startRealHandTracker(
     stopped = true;
     cancelAnimationFrame(raf);
     stream?.getTracks().forEach((t) => t.stop());
+    piImage = null;
     detector?.close();
     detector = null;
     if (video.srcObject === stream) video.srcObject = null;
@@ -54,10 +56,20 @@ export async function startRealHandTracker(
   signal?.addEventListener("abort", stop, { once: true });
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { ...(deviceId ? { deviceId } : { facingMode: "user" }), width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-    if (stopped) { stream.getTracks().forEach((t) => t.stop()); return stop; }
-    video.srcObject = stream;
-    await video.play().catch(() => undefined);
+    if (deviceId === "pi-usb") {
+      piImage = video.parentElement?.querySelector("img.pi-cam-preview") ?? null;
+      if (!piImage) throw new Error("Pi camera preview element is missing");
+      await new Promise<void>((resolve, reject) => {
+        if (piImage!.complete && piImage!.naturalWidth > 0) { resolve(); return; }
+        piImage!.addEventListener("load", () => resolve(), { once: true });
+        piImage!.addEventListener("error", () => reject(new Error("Pi USB camera stream unavailable")), { once: true });
+      });
+    } else {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { ...(deviceId ? { deviceId } : { facingMode: "user" }), width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      if (stopped) { stream.getTracks().forEach((t) => t.stop()); return stop; }
+      video.srcObject = stream;
+      await video.play().catch(() => undefined);
+    }
   } catch (err) {
     onCameraError?.(err);
     stop();
@@ -83,9 +95,14 @@ export async function startRealHandTracker(
     if (document.hidden) {
       smoothed = null;
       onFrame({ timestamp: now, vector: null, landmarks: null, handedness: null });
-    } else if (detector && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
-      lastVideoTime = video.currentTime;
-      const result = detector.detectForVideo(video, now);
+    } else if (detector && (piImage ? piImage.complete && piImage.naturalWidth > 0 : video.readyState >= 2 && video.currentTime !== lastVideoTime)) {
+      if (piImage) {
+        if (now - lastVideoTime < 100) { raf = requestAnimationFrame(tick); return; }
+        lastVideoTime = now;
+      } else {
+        lastVideoTime = video.currentTime;
+      }
+      const result = detector.detectForVideo(piImage ?? video, now);
       const hands: DetectedHand[] = result.landmarks.map((landmarks, i) => ({
         landmarks: landmarks as Point[],
         handedness: toHandedness(result.handedness[i]?.[0]?.categoryName),

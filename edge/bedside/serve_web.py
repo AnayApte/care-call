@@ -2,6 +2,7 @@
 """Serve the built Care Call frontend on the Pi's local VNC browser."""
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import time
 from urllib.parse import urlsplit
 
 DIST = Path(__file__).resolve().parents[2] / "web/dist"
@@ -13,9 +14,48 @@ class Frontend(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path == "/camera.mjpg":
+            self.serve_camera()
+            return
         if path in ("/", "/patient", "/caregiver", "/beacon") or path.startswith("/caregiver/reports/"):
             self.path = "/index.html"
         super().do_GET()
+
+    def serve_camera(self):
+        """Stream frames from the Pi's only connected USB camera (QNX unit 5)."""
+        try:
+            import cv2
+            from qnx_camera import QnxCamera
+        except Exception as exc:
+            self.send_error(503, f"Pi camera unavailable: {exc}")
+            return
+
+        try:
+            camera = QnxCamera(unit=5)
+        except Exception as exc:
+            self.send_error(503, f"Pi USB camera unit 5 unavailable: {exc}")
+            return
+
+        self.send_response(200)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+        self.end_headers()
+        try:
+            while True:
+                frame = camera.read()
+                ok, jpeg = cv2.imencode(".jpg", frame)
+                if not ok:
+                    continue
+                payload = jpeg.tobytes()
+                self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                                 + str(len(payload)).encode("ascii") + b"\r\n\r\n"
+                                 + payload + b"\r\n")
+                self.wfile.flush()
+                time.sleep(0.03)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            camera.close()
 
 
 if __name__ == "__main__":

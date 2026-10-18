@@ -2,7 +2,9 @@
 const STORAGE_KEY = "carecall.cameraId";
 
 export function loadCameraId(): string | undefined {
-  try { return localStorage.getItem(STORAGE_KEY) ?? undefined; } catch { return undefined; }
+  // The Pi-hosted patient screen must use QNX USB camera unit 5, never the Mac browser webcam.
+  try { localStorage.setItem(STORAGE_KEY, "pi-usb"); } catch { /* the Pi source is still the default */ }
+  return "pi-usb";
 }
 
 export function saveCameraId(id: string): void {
