@@ -10,10 +10,10 @@ export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "
 
 const SAMPLES_PER_LABEL = 15;
 const HOLD_MS = 3000;
-const COUNTDOWN_FROM = 3;
+const COUNTDOWN_MS = 1700; // from hand detected to recording start
 const HOLD_CAP_MS = 10000;
 const DONE_SHOW_MS = 1100;
-const AUTO_START_AFTER_MS = 900; // a hand must be in the picture this long before a card starts on its own
+const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
 const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
 
@@ -89,13 +89,10 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   const startCountdown = useCallback(() => {
     sounds.unlock();
     session.current.countdownStartedAt = performance.now();
-    setPhase("countdown", { countdown: COUNTDOWN_FROM, progress: 0, hint: "Get ready." });
+    setPhase("countdown", { countdown: Math.ceil(COUNTDOWN_MS / 1000), progress: 0, hint: "Get ready." });
     sounds.tick();
-    for (let n = COUNTDOWN_FROM - 1; n >= 1; n -= 1) {
-      later(() => { patch({ countdown: n }); sounds.tick(); }, (COUNTDOWN_FROM - n) * 1000);
-    }
-    later(beginHold, COUNTDOWN_FROM * 1000);
-  }, [setPhase, patch, later, beginHold]);
+    later(() => { sounds.tick(); beginHold(); }, COUNTDOWN_MS);
+  }, [setPhase, later, beginHold]);
 
   const finishLabel = useCallback((samples: Sample[]) => {
     const s = session.current;
@@ -130,7 +127,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     if (s.phase === "countdown") {
       // Smooth ring during the countdown: progress follows elapsed time, the digit follows whole seconds.
       const elapsed = performance.now() - s.countdownStartedAt;
-      patch({ progress: Math.min(1, elapsed / (COUNTDOWN_FROM * 1000)) });
+      patch({ progress: Math.min(1, elapsed / COUNTDOWN_MS), countdown: Math.max(1, Math.ceil((COUNTDOWN_MS - elapsed) / 1000)) });
       return;
     }
     if (s.phase === "waiting") {

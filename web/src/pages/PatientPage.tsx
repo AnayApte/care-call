@@ -12,7 +12,7 @@ export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { state, retrain, dismiss } = useOnboarding(videoRef, canvasRef);
-  const { phase, index, countdown, progress, hint, lifting, trigger, result, toast } = state;
+  const { phase, index, progress, hint, lifting, trigger, result, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
 
@@ -50,8 +50,8 @@ export default function PatientPage() {
             )}
             {phase === "countdown" && (
               <>
-                <Ring progress={progress} mode="countdown">{countdown}</Ring>
-                <p className="status">Get ready<small>Recording starts in a moment.</small></p>
+                <Ring progress={progress} mode="countdown" small>Get ready</Ring>
+                <p className="status">Hand found<small>Recording starts in a moment. Make the movement now.</small></p>
               </>
             )}
             {phase === "holding" && (
