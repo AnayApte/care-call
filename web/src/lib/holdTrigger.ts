@@ -11,7 +11,7 @@ const TRIGGER_HOLD_MS = 2000;
 const TRIGGER_GRACE_MS = 400; // a lost hand or a neutral frame is ignored this long, progress holds
 const TRIGGER_CONFLICT_GRACE_MS = 150; // a confident different word gets much less benefit of the doubt
 const TRIGGER_DRAIN_MS = 1500; // after the grace, progress drains at this rate
-const TRIGGER_MIN_CONFIDENCE = 0.7;
+const TRIGGER_MIN_CONFIDENCE = 0.6; // three of five neighbours agreeing
 export function createGestureTrigger() {
   let label: Label | null = null;
   let progress = 0;
