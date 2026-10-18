@@ -40,6 +40,9 @@ export const api = {
   postSample: (label: string, vector: number[]) =>
     call<StoredSample>(`/api/patients/${PATIENT_ID}/samples`, { method: "POST", body: JSON.stringify({ label, vector }) }),
   deleteSamples: () => call<unknown>(`/api/patients/${PATIENT_ID}/samples`, { method: "DELETE" }),
+  /** Contract section 19: the caregiver or patient side marks a request right or wrong. */
+  postFeedback: (requestId: string, correct: boolean) =>
+    call<unknown>(`/api/requests/${requestId}/feedback`, { method: "POST", body: JSON.stringify({ correct }) }),
   createRequest: (label: string, confidence: number) =>
     call<CareRequest>(`/api/requests`, {
       method: "POST",

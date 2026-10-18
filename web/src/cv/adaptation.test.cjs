@@ -175,6 +175,9 @@ test('selective retraining keeps other labels and uses the newest examples', () 
   const latest = latestSamples([...samples, ...replacement]);
   assert.deepEqual(latest.filter(s => s.label !== 'pain'), samples.filter(s => s.label !== 'pain'));
   assert.deepEqual(latest.filter(s => s.label === 'pain'), replacement);
+  const feedbackHistory = latestSamples([...samples, ...replacement], 45);
+  assert.equal(feedbackHistory.filter(s => s.label === 'pain').length, 30);
+  assert.deepEqual(feedbackHistory.filter(s => s.label !== 'pain'), samples.filter(s => s.label !== 'pain'));
 });
 
 test('completed retraining is remembered per approved configuration and reset for a new version', () => {

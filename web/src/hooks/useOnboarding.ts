@@ -19,6 +19,8 @@ const DONE_SHOW_MS = 1100;
 const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
 const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
+const MAX_SAMPLES_PER_LABEL = 45;
+const MAX_HOLD_VECTORS = 30;
 
 export type OnboardingState = {
   phase: Phase;
@@ -34,6 +36,7 @@ export type OnboardingState = {
   /** Recognised word, shown until the caregiver dismisses it with a tap or the spacebar. */
   result: Label | null;
   delivery: "sending" | "sent" | "failed" | null;
+  feedback: "asking" | "correcting" | "done" | null;
   /** Leave-one-out accuracy of the personal model, once all five labels are trained. */
   accuracy: number | null;
   toast: { text: string; kind: "info" | "error" } | null;
@@ -44,7 +47,7 @@ const idleTrigger: TriggerState = { label: null, progress: 0, cooldownMs: 0, fir
 export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const [state, setState] = useState<OnboardingState>({
     phase: "loading", patient: fixturePatient, index: 0, order: TRAINING_ORDER, countdown: 0, progress: 0, hint: "", lifting: null,
-    handPresent: false, trigger: idleTrigger, result: null, delivery: null, accuracy: null, toast: null,
+    handPresent: false, trigger: idleTrigger, result: null, delivery: null, feedback: null, accuracy: null, toast: null,
   });
 
   const reportsRef = useRef<ReturnType<typeof createSessionReporter> | null>(null);
@@ -72,6 +75,11 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     handPresent: false,
     result: null as Label | null,
     requestSerial: 0,
+    resultRequestId: null as string | null,
+    pendingFeedback: null as boolean | null,
+    feedbackAnswered: false,
+    holdVectors: [] as number[][],
+    firedVectors: [] as number[][],
     handSeenSince: null as number | null,
     countdownStartedAt: 0,
     lastPredictionAt: -Infinity,
@@ -98,6 +106,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     reports.setConfigVersion(config.version);
     s.trigger.setConfig(config);
     s.triggerState = idleTrigger;
+    s.holdVectors = [];
     s.lastPredictionAt = -Infinity;
     s.config = config;
     s.pendingConfig = null;
@@ -208,20 +217,37 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (frame.vector && frame.timestamp - s.lastPredictionAt < 1000 / 12) return;
       s.lastPredictionAt = frame.timestamp;
       const prediction = frame.vector ? s.classifier.predict(frame.vector) : null;
+      const previous = s.triggerState;
       const next = s.trigger.update(prediction, frame.timestamp);
+      if (next.label !== previous.label || (!next.fired && next.progress <= previous.progress)) s.holdVectors = [];
+      if ((next.progress > 0 || next.fired) && frame.vector && prediction && prediction.label === next.label) {
+        s.holdVectors = [...s.holdVectors.slice(-(MAX_HOLD_VECTORS - 1)), frame.vector.slice()];
+      } else if (next.progress === 0 && !next.fired) s.holdVectors = [];
       s.triggerState = next;
       if (import.meta.env.DEV) (window as unknown as { __ccDebug?: unknown }).__ccDebug = { prediction, next, ready: s.classifier.isReady(), samples: s.samples.length };
       patch({ trigger: next });
       if (next.fired) {
         const fired = next.fired;
         s.result = fired.label;
+        s.resultRequestId = null;
+        s.pendingFeedback = null;
+        s.feedbackAnswered = false;
+        s.firedVectors = s.holdVectors;
+        s.holdVectors = [];
         const serial = ++s.requestSerial;
         sounds.check();
-        patch({ result: fired.label, delivery: "sending" });
+        patch({ result: fired.label, delivery: "sending", feedback: "asking" });
         void api.createRequest(fired.label, fired.confidence).then((r) => {
           if (serial !== s.requestSerial) return;
           patch({ delivery: r.ok ? "sent" : "failed" });
           if (!r.ok) toast(`Could not send: ${r.error}`, "error");
+          else {
+            s.resultRequestId = r.data.id;
+            if (s.pendingFeedback !== null) {
+              void api.postFeedback(r.data.id, s.pendingFeedback);
+              s.pendingFeedback = null;
+            }
+          }
         });
       }
       return;
@@ -238,7 +264,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (cancelled) return;
       const s = session.current;
       if (patientRes.ok) patch({ patient: patientRes.data });
-      if (samplesRes.ok) s.samples = latestSamples(samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector })));
+      if (samplesRes.ok) s.samples = latestSamples(samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector })), MAX_SAMPLES_PER_LABEL);
       else toast("Server unreachable, training will stay on this device", "error");
       applyConfig(approved ?? s.config);
       if (!approved) toast("Could not load movement settings. Keeping the current settings.", "error");
@@ -307,11 +333,45 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     if (!s.result) return;
     s.result = null;
     s.requestSerial++;
+    s.resultRequestId = null;
+    s.pendingFeedback = null;
+    s.firedVectors = [];
+    s.holdVectors = [];
     s.trigger.reset();
     s.triggerState = idleTrigger;
     s.lastPredictionAt = -Infinity;
-    patch({ result: null, delivery: null, trigger: idleTrigger });
+    patch({ result: null, delivery: null, feedback: null, trigger: idleTrigger });
   }, [patch]);
+
+  /** Rey's feedback updates personal examples; Step 5 also records the explicit meaning. */
+  const learnFrom = useCallback((label: Label, wasCorrect: boolean) => {
+    const s = session.current;
+    if (!s.result || s.feedbackAnswered) return;
+    s.feedbackAnswered = true;
+    reports.recordFeedback(label, s.result);
+    const vectors = s.firedVectors;
+    s.firedVectors = [];
+    if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
+    else s.pendingFeedback = wasCorrect;
+    if (vectors.length === 0) { patch({ feedback: "done" }); return; }
+    const fresh: Sample[] = vectors.map(vector => ({ label, vector }));
+    try {
+      const nextSamples = latestSamples([...s.samples, ...fresh], MAX_SAMPLES_PER_LABEL);
+      s.classifier.setSamples(nextSamples);
+      s.samples = nextSamples;
+    } catch {
+      toast("Could not update the model from that feedback", "error");
+      patch({ feedback: "done" });
+      return;
+    }
+    void Promise.all(fresh.map(smp => api.postSample(smp.label, smp.vector))).then(results => {
+      if (results.some(r => !r.ok)) toast("Server unreachable, the correction is kept on this device", "error");
+    });
+    patch({ feedback: "done", accuracy: s.classifier.leaveOneOutAccuracy() });
+  }, [patch, reports, toast]);
+  const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
+  const feedbackNo = useCallback(() => patch({ feedback: "correcting" }), [patch]);
+  const feedbackCorrect = useCallback((label: Label) => learnFrom(label, false), [learnFrom]);
 
   const retrain = useCallback(async () => {
     const s = session.current;
@@ -324,13 +384,17 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     s.trigger.reset();
     s.result = null;
     s.requestSerial++;
+    s.resultRequestId = null;
+    s.pendingFeedback = null;
+    s.firedVectors = [];
+    s.holdVectors = [];
     s.handSeenSince = null;
     s.lastPredictionAt = -Infinity;
     s.triggerState = idleTrigger;
-    setPhase("waiting", { index: 0, order: s.order, lifting: null, progress: 0, trigger: idleTrigger, result: null, delivery: null, accuracy: null, hint: "Any movement they can repeat works." });
+    setPhase("waiting", { index: 0, order: s.order, lifting: null, progress: 0, trigger: idleTrigger, result: null, delivery: null, feedback: null, accuracy: null, hint: "Any movement they can repeat works." });
     const r = await api.deleteSamples();
     if (!r.ok) toast("Server unreachable, old training may come back on reload", "error");
   }, [setPhase, toast]);
 
-  return { state, start: startCountdown, retrain, dismiss };
+  return { state, start: startCountdown, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect };
 }

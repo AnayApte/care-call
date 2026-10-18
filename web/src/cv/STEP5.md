@@ -12,8 +12,9 @@
 selects movements and remembers completion. The patient hook connects them.
 Only counts and scores go into usage reports, not images or hand coordinates.
 
-The patient page keeps Rey's countdown, smooth hand display and tap-to-dismiss
-result. It uses Josh's configurable trigger at up to 12 observations per second,
+The patient page keeps Rey's countdown, smooth hand display, feedback and
+tap-to-dismiss result. Feedback also supplies explicit corrections for reports.
+It uses Josh's configurable trigger at up to 12 observations per second,
 so approved hold settings keep the units in the shared contract. Rey's separate
 time-based trigger is unchanged.
 
@@ -28,4 +29,6 @@ Tests use synthetic inputs and a temporary database; no external agent is called
 
 Follow-up for Anay: add server deduplication for retried reports and atomic
 per-label sample replacement. A lost HTTP reply can currently cause a duplicate
-report. Stored examples remain history; the browser uses the newest 15 per label.
+report. Stored examples remain history; the browser keeps up to 45 per label,
+including Rey's feedback examples. Requested re-recording replaces that label's
+active examples on this page.

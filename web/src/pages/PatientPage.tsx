@@ -5,15 +5,15 @@ import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
 import { DISPLAY_WORD } from "@/lib/labels";
-import { USE_MOCK_HAND } from "@/lib/cv";
+import { REQUEST_LABELS, USE_MOCK_HAND } from "@/lib/cv";
 import { sounds } from "@/lib/sounds";
 import "@/components/patient/patient.css";
 
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { state, retrain, dismiss } = useOnboarding(videoRef, canvasRef);
-  const { phase, index, order, progress, hint, lifting, trigger, result, delivery, toast } = state;
+  const { state, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect } = useOnboarding(videoRef, canvasRef);
+  const { phase, index, order, progress, hint, lifting, trigger, result, delivery, feedback, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
 
@@ -84,6 +84,30 @@ export default function PatientPage() {
               {delivery === "sent" ? <CheckMark /> : delivery === "sending" ? "Sending" : delivery === "failed" ? "Check" : ""}
             </Ring>
           </div>
+          {result && feedback && feedback !== "done" && (
+            <div className="feedback" onClick={(e) => e.stopPropagation()} role="group" aria-label="Was that right">
+              {feedback === "asking" ? (
+                <>
+                  <p>Was that the right request?</p>
+                  <div className="row">
+                    <button type="button" className="fb yes" onClick={feedbackYes}>Yes</button>
+                    <button type="button" className="fb" onClick={feedbackNo}>No</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>What did they mean?</p>
+                  <div className="row">
+                    {REQUEST_LABELS.filter((l) => l !== result).map((l) => (
+                      <button key={l} type="button" className="fb" onClick={() => feedbackCorrect(l)}>{DISPLAY_WORD[l]}</button>
+                    ))}
+                    <button type="button" className="fb quiet" onClick={() => feedbackCorrect("neutral")}>Nothing</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          {result && feedback === "done" && <div className="feedback thanks"><p>Thanks. The model learned from that. Tap or press space to continue.</p></div>}
           <p className="notice">{state.accuracy !== null && <>Training check: {Math.round(state.accuracy * 100)}% (leave-one-out).<br /></>}Assistive prototype, not a medical device.</p>
         </>
       )}

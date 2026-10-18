@@ -54,7 +54,7 @@ export function createSession(patientId: string, configVersion = 1, startedAt = 
 }
 
 /** Caller flushes on a ten-minute interval and pagehide (keepalive helps on exit).
- * Rotate the session only AFTER a successful post; retain failed summaries to retry.
+ * Retain this closed summary until the server accepts it; new events use a new window.
  */
 export async function postSession(apiBase: string, summary: SessionSummary): Promise<void> {
   const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/cv/sessions`, {

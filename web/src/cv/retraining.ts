@@ -3,8 +3,8 @@ import type { LocalStore } from "./sessionReporter";
 import { LABELS, isLabel, type Label, type Sample } from "./types";
 
 /** Server samples arrive oldest first. Use the latest complete-sized set per label. */
-export function latestSamples(samples: readonly Sample[]): Sample[] {
-  return LABELS.flatMap(label => samples.filter(sample => sample.label === label).slice(-15));
+export function latestSamples(samples: readonly Sample[], perLabel = 15): Sample[] {
+  return LABELS.flatMap(label => samples.filter(sample => sample.label === label).slice(-perLabel));
 }
 
 export function createRetrainingPlan(apiBase: string, patientId: string, storage?: LocalStore) {
