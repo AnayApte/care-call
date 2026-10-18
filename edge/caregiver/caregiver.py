@@ -67,7 +67,8 @@ class Lcd:
                 self.bus.read_byte(self.rgb)
             except OSError:
                 self.rgb = 0x30  # newer Grove LCD (v5) uses 0x30
-            for cmd in (0x01, 0x0C, 0x28):  # clear, display on, 2 lines
+            time.sleep(0.05)
+            for cmd in (0x28, 0x0C, 0x01, 0x06):  # 2 lines, display on, clear, cursor moves right
                 self._cmd(cmd)
                 time.sleep(0.05)
         except Exception as exc:  # no LCD: keep going, print instead
@@ -105,7 +106,7 @@ class Lcd:
             print(f"[lcd] write failed: {exc}")
 
 
-RED, GREEN, DIM, AMBER = (255, 0, 0), (0, 255, 0), (20, 20, 40), (255, 120, 0)
+RED, GREEN, DIM, AMBER = (255, 0, 0), (0, 255, 0), (60, 60, 120), (255, 120, 0)
 
 
 # ---------- main loop ----------
