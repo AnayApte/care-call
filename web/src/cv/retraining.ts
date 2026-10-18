@@ -1,10 +1,10 @@
 import type { AdaptConfig } from "./adapt";
 import type { LocalStore } from "./sessionReporter";
-import { LABELS, isLabel, type Label, type Sample } from "./types";
+import { isLabel, type Label, type Sample } from "./types";
 
-/** Server samples arrive oldest first. Use the latest complete-sized set per label. */
-export function latestSamples(samples: readonly Sample[], perLabel = 15): Sample[] {
-  return LABELS.flatMap(label => samples.filter(sample => sample.label === label).slice(-perLabel));
+/** Re-record one movement without removing other movements or their different styles. */
+export function replaceLabelSamples(samples: readonly Sample[], label: Label, fresh: readonly Sample[]): Sample[] {
+  return [...samples.filter(sample => sample.label !== label), ...fresh];
 }
 
 export function createRetrainingPlan(apiBase: string, patientId: string, storage?: LocalStore) {

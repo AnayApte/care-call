@@ -6,7 +6,7 @@ const load = name => require(path.join(process.env.CV_TEST_BUILD, name + '.js'))
 const { createGestureTrigger } = load('trigger');
 const { createSessionReporter, startSessionReporting } = load('sessionReporter');
 const { sanitizeAdaptConfig, loadApprovedConfig } = load('adapt');
-const { createRetrainingPlan, latestSamples } = load('retraining');
+const { createRetrainingPlan, replaceLabelSamples } = load('retraining');
 const { LABELS } = load('types');
 const water = { label: 'water', confidence: .8 };
 const fired = { label: 'water', confidence: .9, minConfidence: .8, holdFrames: 12, fired: true };
@@ -167,17 +167,16 @@ test('malformed or failed settings loads do not become usable proposals', async 
 });
 
 const samples = LABELS.flatMap(label => Array.from({ length: 15 }, (_, i) => ({ label, vector: [i] })));
-test('selective retraining keeps other labels and uses the newest examples', () => {
+test('selective retraining replaces one label and keeps other movement styles', () => {
   const config = sanitizeAdaptConfig({ version: 2, retrain_labels: ['pain'] });
   const plan = createRetrainingPlan('http://localhost:8000', 'p_demo'); plan.setConfig(config);
   assert.deepEqual(plan.order(samples, LABELS), ['pain']);
   const replacement = Array.from({ length: 15 }, (_, i) => ({ label: 'pain', vector: [100 + i] }));
-  const latest = latestSamples([...samples, ...replacement]);
-  assert.deepEqual(latest.filter(s => s.label !== 'pain'), samples.filter(s => s.label !== 'pain'));
+  const otherStyle = Array.from({ length: 15 }, (_, i) => ({ label: 'water', vector: [200 + i] }));
+  const before = [...samples, ...otherStyle];
+  const latest = replaceLabelSamples(before, 'pain', replacement);
+  assert.deepEqual(latest.filter(s => s.label !== 'pain'), before.filter(s => s.label !== 'pain'));
   assert.deepEqual(latest.filter(s => s.label === 'pain'), replacement);
-  const feedbackHistory = latestSamples([...samples, ...replacement], 45);
-  assert.equal(feedbackHistory.filter(s => s.label === 'pain').length, 30);
-  assert.deepEqual(feedbackHistory.filter(s => s.label !== 'pain'), samples.filter(s => s.label !== 'pain'));
 });
 
 test('completed retraining is remembered per approved configuration and reset for a new version', () => {

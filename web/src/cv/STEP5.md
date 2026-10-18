@@ -29,6 +29,8 @@ Tests use synthetic inputs and a temporary database; no external agent is called
 
 Follow-up for Anay: add server deduplication for retried reports and atomic
 per-label sample replacement. A lost HTTP reply can currently cause a duplicate
-report. Stored examples remain history; the browser keeps up to 45 per label,
-including Rey's feedback examples. Requested re-recording replaces that label's
-active examples on this page.
+report. Stored examples remain history. Rey's sample helper keeps up to 60 per
+label and removes near-duplicates first, preserving different styles. Feedback
+adds at most five spread-out examples. "Nothing" counts as a false trigger in
+the report and does not train neutral. Requested re-recording replaces that
+label's active examples on this page.

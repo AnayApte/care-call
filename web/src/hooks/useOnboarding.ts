@@ -5,10 +5,11 @@ import { createGestureTrigger, type TriggerState } from "@/cv/trigger";
 import { TRAINING_ORDER } from "@/lib/labels";
 import { sounds } from "@/lib/sounds";
 import { createSteadinessGate } from "@/lib/steady";
+import { spreadFrames, trimSamples } from "@/lib/samples";
 import { drawHand, type HandTone } from "@/lib/drawHand";
 import { loadApprovedConfig, sanitizeAdaptConfig, type AdaptConfig } from "@/cv/adapt";
 import { browserStore, createSessionReporter, startSessionReporting } from "@/cv/sessionReporter";
-import { createRetrainingPlan, latestSamples } from "@/cv/retraining";
+import { createRetrainingPlan, replaceLabelSamples } from "@/cv/retraining";
 
 export type Phase = "loading" | "waiting" | "countdown" | "holding" | "done" | "listening";
 
@@ -19,8 +20,8 @@ const DONE_SHOW_MS = 1100;
 const AUTO_START_AFTER_MS = 0; // the countdown begins as soon as a hand is detected
 const TOAST_MS = 3000;
 const LISTEN_GRACE_MS = 3000; // after training the hand is still holding the last pose; do not fire on it
-const MAX_SAMPLES_PER_LABEL = 45;
-const MAX_HOLD_VECTORS = 30;
+const MAX_HOLD_VECTORS = 30; // frames remembered from a recognition hold
+const FEEDBACK_SAMPLES = 5; // examples spread across a confirmed or corrected hold
 
 export type OnboardingState = {
   phase: Phase;
@@ -132,7 +133,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   const finishLabel = useCallback((samples: Sample[]) => {
     const s = session.current;
     const label = s.order[s.index];
-    s.samples = [...s.samples.filter(sample => sample.label !== label), ...samples];
+    s.samples = replaceLabelSamples(s.samples, label, samples);
     s.retraining.complete(label);
     s.capture = null;
     sounds.check();
@@ -264,7 +265,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
       if (cancelled) return;
       const s = session.current;
       if (patientRes.ok) patch({ patient: patientRes.data });
-      if (samplesRes.ok) s.samples = latestSamples(samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector })), MAX_SAMPLES_PER_LABEL);
+      if (samplesRes.ok) s.samples = trimSamples(samplesRes.data.map((x) => ({ label: x.label as Label, vector: x.vector })));
       else toast("Server unreachable, training will stay on this device", "error");
       applyConfig(approved ?? s.config);
       if (!approved) toast("Could not load movement settings. Keeping the current settings.", "error");
@@ -343,20 +344,20 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     patch({ result: null, delivery: null, feedback: null, trigger: idleTrigger });
   }, [patch]);
 
-  /** Rey's feedback updates personal examples; Step 5 also records the explicit meaning. */
-  const learnFrom = useCallback((label: Label, wasCorrect: boolean) => {
+  /** Keep Rey's feedback learning. "Nothing" is reported as a false trigger without teaching neutral. */
+  const learnFrom = useCallback((label: Label | null, wasCorrect: boolean) => {
     const s = session.current;
     if (!s.result || s.feedbackAnswered) return;
     s.feedbackAnswered = true;
-    reports.recordFeedback(label, s.result);
-    const vectors = s.firedVectors;
+    reports.recordFeedback(label ?? "neutral", s.result);
+    const vectors = spreadFrames(s.firedVectors, FEEDBACK_SAMPLES);
     s.firedVectors = [];
     if (s.resultRequestId) void api.postFeedback(s.resultRequestId, wasCorrect);
     else s.pendingFeedback = wasCorrect;
-    if (vectors.length === 0) { patch({ feedback: "done" }); return; }
+    if (!label || vectors.length === 0) { patch({ feedback: "done" }); return; }
     const fresh: Sample[] = vectors.map(vector => ({ label, vector }));
     try {
-      const nextSamples = latestSamples([...s.samples, ...fresh], MAX_SAMPLES_PER_LABEL);
+      const nextSamples = trimSamples([...s.samples, ...fresh]);
       s.classifier.setSamples(nextSamples);
       s.samples = nextSamples;
     } catch {
@@ -371,7 +372,8 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
   }, [patch, reports, toast]);
   const feedbackYes = useCallback(() => { const r = session.current.result; if (r) learnFrom(r, true); }, [learnFrom]);
   const feedbackNo = useCallback(() => patch({ feedback: "correcting" }), [patch]);
-  const feedbackCorrect = useCallback((label: Label) => learnFrom(label, false), [learnFrom]);
+  /** `label` is what they actually meant. "Nothing" (null) only records the miss; it does not teach the model. */
+  const feedbackCorrect = useCallback((label: Label | null) => learnFrom(label, false), [learnFrom]);
 
   const retrain = useCallback(async () => {
     const s = session.current;

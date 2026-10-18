@@ -19,3 +19,5 @@
 2026-10-17 | Synced with main before merging step 4. Updated device wording for the team's switch to Raspberry Pi. Server alert checks still pass.
 
 2026-10-17 | Connected Step 5 reports, approved settings and selective retraining. Reports retry after failure; settings stay bounded and wait for a hold to finish. Selective retraining kept the other movements intact. Live CREAO setup remains Rey's part.
+
+2026-10-17 | Resolved Step 5 conflicts with main. Kept Rey's gentler feedback and different movement styles. "Nothing" enters reports without teaching neutral.

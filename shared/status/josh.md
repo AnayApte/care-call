@@ -9,7 +9,7 @@ Works:
 - Selective Pain retraining kept all 60 other examples and survived refresh.
 - Per-label limits, report versions and retraining completion have automated checks.
 - Live approved-setting updates and Help-only retraining passed in browser simulation.
-- Includes Rey's PR #14 feedback screen; explicit corrections now enter reports.
+- Includes Rey's PR #18 feedback: keeps different styles and records "Nothing" without training neutral.
 - 48 JavaScript tests, five server checks, TypeScript and the web build pass.
 - Earlier guided arm demo and browser beacon preview remain available.
 
