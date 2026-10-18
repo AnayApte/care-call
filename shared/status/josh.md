@@ -60,3 +60,8 @@ Verified on 2026-10-18, code commit 8bc8221:
 
 Still needed: fresh real-camera trials and accuracy counts, the chosen deployed server's
 CREAO check, and Alex's real Pi checks. The v2 real-camera/hardware boxes remain unchecked.
+
+Camera preview fix (2026-10-18): moved the shading off the live video into a separate
+layer. The local patient page at port 5181 shows live video again; Josh confirmed
+his image and the hand dots are visible. This verifies the preview and tracking,
+not gesture accuracy or a complete request cycle. Typecheck and production build pass.
