@@ -187,7 +187,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     startHandTracker(video, onFrame, (err) => {
       const name = err instanceof Error ? err.name : "";
       toast(name === "NotAllowedError" ? "Camera blocked. Allow camera access in the address bar and reload." : "No camera found or it is in use by another app.", "error");
-    })
+    }, () => toast("Hand model failed to load. Check the network and reload.", "error"))
       .then((fn) => { if (cancelled) fn(); else stop = fn; })
       .catch(() => toast("Could not start hand tracking.", "error"));
     return () => { cancelled = true; stop?.(); };
