@@ -1,0 +1,77 @@
+/* Patient page: framed camera, flashcard deck, ring. Built from mockups/a1-paper-tag.html. */
+.cam-frame { position: absolute; inset: var(--frame-inset); border-radius: var(--frame-radius); overflow: hidden;
+  border: 3px solid rgba(27, 31, 29, 0.85); box-shadow: inset 0 0 0 2px rgba(243, 239, 231, 0.6); background: #2c2d2b; }
+.cam-frame video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+  filter: brightness(0.82) saturate(0.85); transition: filter var(--duration-normal); }
+.cam-frame.dim video { filter: brightness(0.55) saturate(0.7); }
+.cam-frame .hand { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); pointer-events: none; }
+.cam-frame .hand line { stroke: rgba(255, 255, 255, 0.55); stroke-width: 2; }
+.cam-frame .hand circle { fill: #fff; opacity: 0.9; }
+.cam-frame .hand.live line { stroke: var(--pine-soft); }
+.cam-frame .hand.faint { opacity: 0.35; }
+
+.deck { position: absolute; left: 72px; top: 96px; width: var(--card-w); height: var(--card-h); }
+.card { position: absolute; left: 0; top: 0; width: var(--card-w); height: var(--card-h); padding: 40px 44px 36px; background: #f4efe4; color: var(--ink);
+  box-shadow: 0 24px 40px -20px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.08);
+  clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 0 100%);
+  transform: rotate(-1.4deg); transition: transform var(--duration-lift) var(--ease-out), opacity var(--duration-lift) var(--ease-out); }
+.card::before { content: ""; position: absolute; right: 0; top: 0; width: 28px; height: 28px; z-index: 1; background: #e3dccb; clip-path: polygon(0 0, 0 100%, 100% 100%); }
+.card::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.5; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.5 0 0 0 0 0.42 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.card.behind { z-index: 0; box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(0, 0, 0, 0.08); }
+.card.behind > * { visibility: hidden; }
+.card.behind.b1 { transform: translate(10px, -12px) rotate(1.6deg); background: #ece6d8; }
+.card.behind.b2 { transform: translate(-8px, -24px) rotate(-2.8deg); background: #e4ddcd; }
+.card.behind.b3 { transform: translate(14px, -34px) rotate(3.4deg); background: #dcd4c2; }
+.card.behind.b4 { transform: translate(-4px, -44px) rotate(-1deg); background: #d4ccb8; }
+.card.top { z-index: 2; }
+.card.lifting { z-index: 3; animation: card-lift var(--duration-lift) var(--ease-out) forwards; box-shadow: 0 40px 50px -20px rgba(0, 0, 0, 0.6); }
+@keyframes card-lift {
+  from { transform: rotate(-1.4deg); opacity: 1; }
+  to { transform: translateY(-330px) rotate(-7deg); opacity: 0; }
+}
+.card .step { font-size: 18px; color: var(--mute); margin: 0 0 18px; font-weight: 500; }
+.card .word { font-size: 124px; line-height: 0.92; margin: 0 0 22px; font-weight: 700; letter-spacing: -0.02em; font-variation-settings: "opsz" 96; }
+.card .ask { font-size: 24px; line-height: 1.3; margin: 0; max-width: 24ch; }
+.card .ask.ok { color: var(--pine); font-weight: 600; }
+.card .hint { font-size: var(--text-hint); color: var(--mute); margin: 18px 0 0; }
+
+.dock { position: absolute; left: 72px; bottom: 72px; display: flex; align-items: center; gap: 36px; }
+.status { color: #fff; font-size: var(--text-status); font-weight: 500; margin: 0; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); }
+.status small { display: block; color: rgba(255, 255, 255, 0.72); font-size: var(--text-hint); font-weight: 400; margin-top: 4px; }
+
+.ring { position: relative; width: 168px; height: 168px; flex: none; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { fill: none; stroke: var(--ring-track); stroke-width: 14; }
+.ring .fill { fill: none; stroke: var(--pine); stroke-width: 14; stroke-dasharray: 471; transition: stroke-dashoffset 120ms linear, stroke var(--duration-fast); }
+.ring.countdown .fill { stroke: var(--signal); }
+.ring .label { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 56px; }
+.ring .label.small { font-size: 22px; font-weight: 500; }
+.ring.done { border-radius: 50%; background: var(--pine); }
+.ring.done svg { visibility: hidden; }
+.ring.large { width: 220px; height: 220px; }
+.ring.large .label.small { font-size: 26px; }
+
+.rail { position: absolute; right: 72px; top: 72px; display: grid; gap: 10px; }
+.rail span { height: 6px; width: 52px; background: rgba(255, 255, 255, 0.3); border-radius: 3px; }
+.rail span.done { background: var(--pine); }
+.rail span.now { background: #fff; }
+
+.btn-start { height: 64px; padding: 0 36px; border-radius: 999px; font-size: 22px; font-weight: 600; border: 0; background: var(--pine); color: #fff; cursor: pointer;
+  transition: transform var(--duration-fast), filter var(--duration-fast); }
+.btn-start:hover { filter: brightness(1.08); }
+.btn-start:active { transform: scale(0.97); }
+
+.btn-retrain { position: absolute; right: 60px; top: 56px; height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff; background: rgba(0, 0, 0, 0.25); font-size: 16px; cursor: pointer; backdrop-filter: blur(6px); }
+.btn-retrain:hover { background: rgba(0, 0, 0, 0.4); }
+
+.live-word { color: #fff; font-size: var(--text-word-live); font-weight: 700; letter-spacing: -0.02em; position: absolute; left: 72px; bottom: 160px; margin: 0; line-height: 1;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
+.live-sub { position: absolute; left: 74px; bottom: 110px; color: rgba(255, 255, 255, 0.78); font-size: 22px; margin: 0; }
+.live-ring { position: absolute; right: 88px; bottom: 88px; }
+.notice { position: absolute; left: 72px; bottom: 46px; color: rgba(255, 255, 255, 0.7); font-size: 15px; margin: 0; }
+
+.toast { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); background: rgba(27, 31, 29, 0.7); color: #fff; padding: 12px 22px; border-radius: 999px;
+  font-size: 18px; backdrop-filter: blur(8px); }
+.toast.error { background: rgba(179, 65, 47, 0.85); }
