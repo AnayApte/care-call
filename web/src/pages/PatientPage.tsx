@@ -50,7 +50,7 @@ export default function PatientPage() {
             )}
             {phase === "countdown" && (
               <>
-                <Ring progress={1 - countdown / 3} mode="countdown">{countdown}</Ring>
+                <Ring progress={progress} mode="countdown">{countdown}</Ring>
                 <p className="status">Get ready<small>Recording starts in a moment.</small></p>
               </>
             )}

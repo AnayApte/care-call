@@ -61,6 +61,7 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     handPresent: false,
     result: null as Label | null,
     handSeenSince: null as number | null,
+    countdownStartedAt: 0,
   });
 
   const patch = useCallback((p: Partial<OnboardingState>) => setState((s) => ({ ...s, ...p })), []);
@@ -87,7 +88,8 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
 
   const startCountdown = useCallback(() => {
     sounds.unlock();
-    setPhase("countdown", { countdown: COUNTDOWN_FROM, hint: "Get ready." });
+    session.current.countdownStartedAt = performance.now();
+    setPhase("countdown", { countdown: COUNTDOWN_FROM, progress: 0, hint: "Get ready." });
     sounds.tick();
     for (let n = COUNTDOWN_FROM - 1; n >= 1; n -= 1) {
       later(() => { patch({ countdown: n }); sounds.tick(); }, (COUNTDOWN_FROM - n) * 1000);
@@ -125,6 +127,12 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     const tone: HandTone = s.phase === "holding" || s.phase === "listening" ? "live" : "faint";
     if (canvasRef.current && videoRef.current) drawHand(canvasRef.current, videoRef.current, frame.landmarks, tone);
     if (present !== s.handPresent) { s.handPresent = present; patch({ handPresent: present }); }
+    if (s.phase === "countdown") {
+      // Smooth ring during the countdown: progress follows elapsed time, the digit follows whole seconds.
+      const elapsed = performance.now() - s.countdownStartedAt;
+      patch({ progress: Math.min(1, elapsed / (COUNTDOWN_FROM * 1000)) });
+      return;
+    }
     if (s.phase === "waiting") {
       if (!present) { s.handSeenSince = null; return; }
       s.handSeenSince ??= frame.timestamp;
