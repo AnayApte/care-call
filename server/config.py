@@ -34,6 +34,8 @@ ENABLE_CREAO = env_bool("ENABLE_CREAO")
 
 DEVICE_HEARTBEAT_TIMEOUT_S = 15
 ACKED_DISPLAY_S = 5
+# How long DeviceState.last_ack stays set, so a bedside device on bad Wi-Fi never misses "Help is coming".
+LAST_ACK_WINDOW_S = 120
 ACKED_MESSAGE = "On the way"
 DEFAULT_DEVICE_ID = "beacon_1"
 
