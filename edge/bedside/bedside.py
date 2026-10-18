@@ -37,6 +37,7 @@ DEVICE_ID = os.environ.get("DEVICE_ID", "bedside_1")
 PHRASE = "Help is coming."
 CLIPS = Path.home() / ".carecall"
 SPEAK_REQUESTS = os.environ.get("SPEAK_REQUESTS", "true").lower() == "true"
+SPEAK_ACKS = os.environ.get("SPEAK_ACKS", "true").lower() == "true"  # false on the caregiver unit
 AUDIO_FORMAT = os.environ.get("AUDIO_FORMAT", "mp3")  # "wav" on QNX (its "wave" player cannot decode MP3)
 
 
@@ -65,7 +66,7 @@ def clip_for(text: str):
 
 
 def speak(text: str = PHRASE) -> None:
-    player = os.environ.get("PLAYER") or next((p for p in ("mpg123", "ffplay", "cvlc", "wave", "aplay") if shutil.which(p)), None)
+    player = os.environ.get("PLAYER") or next((p for p in ("paplay", "pw-play", "mpg123", "ffplay", "cvlc", "wave", "aplay") if shutil.which(p)), None)
     clip = clip_for(text)
     if clip and player:
         args = {"mpg123": ["mpg123", "-q"], "ffplay": ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"],
@@ -96,7 +97,7 @@ def main():
 
     threading.Thread(target=heartbeat, daemon=True).start()
     clip_for(PHRASE)
-    print(f"[bedside] {DEVICE_ID} -> {SERVER} (speak requests: {SPEAK_REQUESTS})")
+    print(f"[bedside] {DEVICE_ID} -> {SERVER} (speak requests: {SPEAK_REQUESTS}, acks: {SPEAK_ACKS}, {AUDIO_FORMAT})")
 
     spoken = None  # request id we last said "Help is coming" for; acks from before start are ignored
     announced = None  # request id we last read out
@@ -119,7 +120,7 @@ def main():
                 if text:
                     print(f"[bedside] new request {announced}: {text!r}")
                     speak(text)
-            if ack_id and ack_id != spoken:
+            if ack_id and ack_id != spoken and SPEAK_ACKS:
                 spoken = ack_id
                 print(f"[bedside] {ack['display']} answered by {ack['acked_by']}: \"{PHRASE}\"")
                 speak(PHRASE)
