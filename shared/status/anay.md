@@ -36,12 +36,11 @@ All teammates are collaborators on every service below (added 2026-10-17 ~7:45 P
 | CREAO | adaptation agent | Rey | `CREAO_API_KEY`, `CREAO_AGENT_ID` |
 | Vercel | web app | Rey | `VITE_API_BASE`, `VITE_SENTRY_DSN` |
 
-Server variables (Railway): `PUBLIC_BASE_URL DEVICE_TOKEN SEED_DEMO ESCALATE_MESSAGE_AFTER_S ESCALATE_CALL_AFTER_S ENABLE_PHOTON ENABLE_PHONE_CALL ENABLE_CREAO PHOTON_PROJECT_ID PHOTON_PROJECT_SECRET CAREGIVER_PHONE ELEVENLABS_API_KEY ELEVENLABS_VOICE_ID ELEVENLABS_AGENT_ID ELEVENLABS_AGENT_PHONE_NUMBER_ID GEMINI_API_KEY SENTRY_DSN SENTRY_ENVIRONMENT CREAO_API_KEY CREAO_AGENT_ID RAILWAY_DOCKERFILE_PATH`
+Server variables (everyone can read the values in Railway → care-call → Variables → Raw Editor; that is the source of truth): `PUBLIC_BASE_URL DEVICE_TOKEN SEED_DEMO ESCALATE_MESSAGE_AFTER_S ESCALATE_CALL_AFTER_S ENABLE_PHOTON ENABLE_PHONE_CALL ENABLE_CREAO PHOTON_PROJECT_ID PHOTON_PROJECT_SECRET CAREGIVER_PHONE ELEVENLABS_API_KEY ELEVENLABS_VOICE_ID ELEVENLABS_AGENT_ID ELEVENLABS_AGENT_PHONE_NUMBER_ID GEMINI_API_KEY SENTRY_DSN SENTRY_ENVIRONMENT CREAO_API_KEY CREAO_AGENT_ID RAILWAY_DOCKERFILE_PATH`
 
-Hardware: caregiver Pi `ssh aboldt7191@172.20.10.2` on Anay's phone hotspot, script `~/caregiver/caregiver.py` (+ `.env`); bedside Pi script in `edge/bedside/`. Both use the Railway `DEVICE_TOKEN`.
+Hardware: caregiver Pi `ssh aboldt7191@172.20.10.2` on Alex's phone hotspot, script `~/caregiver/caregiver.py` (+ `.env`); bedside Pi script in `edge/bedside/`. Both use the Railway `DEVICE_TOKEN`.
 
 Before Anay leaves:
 1. `CAREGIVER_PHONE` is Anay's number: change it in Railway to whoever demos as caregiver and enroll their phone in the Photon project.
-2. The Pis use Anay's hotspot: move them to another hotspot (new Wi-Fi on each Pi; IPs change).
-3. Only one Photon bridge may run: never run the server locally with `ENABLE_PHOTON=true`.
-4. Rotate the ElevenLabs key and `DEVICE_TOKEN` after the hackathon (they were pasted in chat).
+2. Only one Photon bridge may run: never run the server locally with `ENABLE_PHOTON=true`.
+3. Rotate the ElevenLabs key and `DEVICE_TOKEN` after the hackathon (they were pasted in chat).
