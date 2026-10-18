@@ -7,3 +7,4 @@
 - 2026-10-17: CREAO adaptation plumbing (sessions, feedback, adapt-config, adapt run/status calling creao.py, clean failure, never an invented proposal) and `server/seed.py` with 4 synthetic sessions for Maria.
 - 2026-10-17: deployed to Railway at https://care-call-production.up.railway.app; smoke-tested health, device token, request -> alert -> button ack -> acked, CORS.
 - 2026-10-17 ~5 PM: Photon iMessage via `server/photon-bridge` (spectrum-ts sidecar): escalation text + native poll, ack by poll tap or reply, status replies, ack follow-ups. Tested live on a real phone.
+- 2026-10-17 ~6:40 PM: ElevenLabs TTS (cached, pre-generated), Sentry (tracing, logs, profiling, custom + AI spans), Gemini free-text replies with model fallback, demo seed of a day of answered requests, request list sorted by time, bridge logs every inbound event.
