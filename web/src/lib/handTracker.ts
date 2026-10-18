@@ -1,8 +1,10 @@
-/** Real hand tracking with MediaPipe, used until Josh's `src/cv/camera.ts` merges. Same model, WASM version and
- * feature convention as his code (contract section 8), so stored samples stay compatible.
+/** Hand tracking with MediaPipe for the patient screen. Same model and WASM version as Josh's `cv/camera.ts`, and his
+ * `extractFeatures`, so stored samples are identical. Differences: detects on every camera frame instead of 12 per
+ * second, and smooths landmarks, because the patient screen draws the skeleton live.
  */
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
-import type { HandFrame } from "./cvMock";
+import { extractFeatures as contractFeatures } from "../cv/features";
+import type { HandFrame } from "../cv/patient";
 import type { Point } from "./steady";
 
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm";
@@ -10,13 +12,8 @@ const MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/h
 /** Exponential smoothing on landmark positions. 1 = raw, lower = smoother but laggier. */
 const SMOOTHING = 0.6;
 
-/** Contract section 8: subtract the wrist, divide by the max distance from the wrist, flatten x and y. */
-export function extractFeatures(points: readonly Point[]): number[] | null {
-  if (points.length !== 21 || points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return null;
-  const centered = points.map((p) => ({ x: p.x - points[0].x, y: p.y - points[0].y }));
-  const scale = Math.max(...centered.map((p) => Math.hypot(p.x, p.y)));
-  if (!Number.isFinite(scale) || scale <= 1e-12) return null;
-  return centered.flatMap((p) => [p.x / scale, p.y / scale]);
+function extractFeatures(points: readonly Point[]): number[] | null {
+  try { return contractFeatures(points); } catch { return null; }
 }
 
 export async function startRealHandTracker(
@@ -24,6 +21,7 @@ export async function startRealHandTracker(
   onFrame: (frame: HandFrame) => void,
   onCameraError?: (err: unknown) => void,
   onModelError?: (err: unknown) => void,
+  signal?: AbortSignal,
 ): Promise<() => void> {
   let stream: MediaStream | null = null;
   let detector: HandLandmarker | null = null;
@@ -39,6 +37,8 @@ export async function startRealHandTracker(
     detector = null;
     if (video.srcObject === stream) video.srcObject = null;
   };
+  if (signal?.aborted) return stop;
+  signal?.addEventListener("abort", stop, { once: true });
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
