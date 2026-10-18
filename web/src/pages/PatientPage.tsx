@@ -57,8 +57,8 @@ export default function PatientPage() {
       {phase === "listening" && (
         <>
           <button type="button" className="btn-retrain" onClick={retrain}>Retrain movements</button>
-          <h2 className="live-word">{liveWord ? DISPLAY_WORD[liveWord] : "Listening"}</h2>
-          <p className="live-sub">{lastSent ? "Request sent. Help is on the way." : liveWord ? "Keep holding to send the request." : "Make a movement and hold it."}</p>
+          <h2 className="live-word">{liveWord ? DISPLAY_WORD[liveWord] : "Ready"}</h2>
+          <p className="live-sub">{lastSent ? "Request sent. Help is on the way." : liveWord ? "Keep holding to send the request." : "Watching for a movement. Make one and hold it."}</p>
           <div className="live-ring">
             <Ring progress={lastSent ? 1 : trigger.progress} mode={lastSent ? "done" : "hold"} large small>
               {lastSent ? <CheckMark /> : trigger.cooldownMs > 0 ? "Sent" : trigger.label ? "Sending" : ""}
