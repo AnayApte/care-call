@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { Deck } from "@/components/patient/Deck";
 import { HandCanvas } from "@/components/patient/HandOverlay";
 import { Ring, CheckMark } from "@/components/patient/Ring";
 import { StepRail } from "@/components/patient/StepRail";
+import { CameraSelect } from "@/components/patient/CameraSelect";
+import { loadCameraId } from "@/lib/cameraPref";
 import { TRAINING_ORDER, DISPLAY_WORD } from "@/lib/labels";
 import { REQUEST_LABELS } from "@/lib/cv";
 import { sounds } from "@/lib/sounds";
@@ -13,7 +15,8 @@ import "@/components/patient/patient.css";
 export default function PatientPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { state, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect } = useOnboarding(videoRef, canvasRef);
+  const [cameraId, setCameraId] = useState(loadCameraId);
+  const { state, retrain, dismiss, feedbackYes, feedbackNo, feedbackCorrect } = useOnboarding(videoRef, canvasRef, cameraId);
   const { phase, index, progress, hint, lifting, trigger, result, feedback, toast } = state;
   const onboarding = phase !== "listening" && phase !== "loading";
   const deciding = !result && trigger.progress > 0;
@@ -38,6 +41,7 @@ export default function PatientPage() {
         <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" />
         <HandCanvas ref={canvasRef} />
       </div>
+      {!USE_MOCK_HAND && <CameraSelect value={cameraId} onChange={setCameraId} />}
 
       {onboarding && (
         <>
