@@ -28,13 +28,10 @@
   gap: 16px;
 }
 .patient-design .patient-tools {
-  position: static; grid-column: 1; grid-row: 1; max-width: none;
+  position: static; grid-column: 1; grid-row: 2; max-width: none;
   align-items: flex-start; gap: 8px; font-size: 11px;
 }
-.patient-design .patient-tools > span {
-  flex-basis: 100%; color: #ededeb; line-height: 1.5;
-  text-shadow: 0 1px 6px #000;
-}
+.patient-design .patient-brand { grid-column: 1; grid-row: 1; justify-self: start; padding: 4px 10px 4px 4px; background: #080808; border: 1px solid #525252; color: #f0f0ed; }
 .patient-design .cam-select {
   position: static; grid-column: 2; grid-row: 1; transform: none;
   height: 44px; border-radius: 0; padding-left: 12px;
@@ -119,6 +116,7 @@
   .patient-design { --frame-inset: 12px; --card-w: calc(100vw - 64px); --card-top: 258px; --card-h: min(290px, 37vh); --ring-size: 100px; }
   .patient-toolbar { left: 28px; right: 28px; top: 28px; gap: 10px; }
   .patient-design .patient-tools { font-size: 10px; }
+  .patient-design .patient-tools { grid-column: 1 / -1; grid-row: 4; }
   .patient-design .live-actions { grid-column: 1 / -1; grid-row: 3; max-width: none; }
   .patient-design .btn-retrain { padding: 10px 12px; font-size: 12px; }
   .patient-design .cam-select { grid-column: 1 / -1; }

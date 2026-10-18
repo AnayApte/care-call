@@ -89,3 +89,10 @@ Matched patient buttons, type, training cards and feedback. Caregiver screen is 
 at the top right. Live camera still shows; narrow training and form styles checked
 with a temporary preview that sends no requests or recordings.
 Typecheck, changed-file lint and production build pass.
+
+Beacon branding (2026-10-18): added a lighthouse mark from Josh's reference to the
+patient, caregiver, report and fallback headers, plus the browser icon and title.
+Removed website sound controls, training beeps and browser speech. External speaker
+code is unchanged. 65 CV checks, typecheck, changed-file lint and build pass.
+The silent request/acknowledgement cycle has an automated check. Live caregiver
+branding checked. Training-save investigation is next; no recordings were reset.

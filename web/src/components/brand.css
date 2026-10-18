@@ -1,0 +1,11 @@
+.beacon-brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; font-family: Arial, Helvetica, sans-serif; vertical-align: middle; }
+.beacon-brand .beacon-mark { display: block; width: 36px; height: 42px; flex: none; }
+.beacon-brand .beacon-brand-copy { display: grid; gap: 5px; }
+.beacon-brand .beacon-wordmark { font-size: 23px; font-weight: 400; letter-spacing: -.055em; line-height: 1; }
+.beacon-brand .beacon-view { color: #aaa; font: 8px/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .14em; }
+.brand-link { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
+@media (max-width: 480px) {
+  .beacon-brand { gap: 7px; }
+  .beacon-brand .beacon-mark { width: 29px; height: 36px; }
+  .beacon-brand .beacon-wordmark { font-size: 20px; }
+}

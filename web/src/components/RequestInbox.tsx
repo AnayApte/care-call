@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE, PATIENT_ID } from "../lib/api";
 import { createRequestsClient, type CareRequest } from "../lib/requests";
-import { sounds } from "../lib/sounds";
 import { REQUEST_LABELS } from "../cv/patient";
 import { DISPLAY_WORD } from "../lib/labels";
 import type { Label } from "../cv/types";
@@ -44,26 +43,17 @@ export default function RequestInbox({ beacon = false }: { beacon?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [sound, setSound] = useState(false);
   const [busy, setBusy] = useState<string[]>([]);
   const [historyLimit, setHistoryLimit] = useState(5);
-  const soundRef = useRef(false);
   const busyRef = useRef(new Set<string>());
-  const key = `carecall:seen-alerts:${API_BASE}:${PATIENT_ID}:${beacon ? "beacon" : "caregiver"}`;
-  const seen = useRef(new Set<string>());
 
   useEffect(() => {
-    try { seen.current = new Set(JSON.parse(sessionStorage.getItem(key) ?? "[]")); } catch { /* In-memory alerts still work. */ }
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
         const rows = await client.list();
         if (stopped) return;
-        const fresh = rows.filter(r => r.status === "open" && !seen.current.has(r.id));
-        rows.forEach(r => seen.current.add(r.id));
-        try { sessionStorage.setItem(key, JSON.stringify([...seen.current].slice(-500))); } catch { /* Keep this page open to retain alert history. */ }
-        if (fresh.length && soundRef.current) sounds.check();
         setRequests(old => rows.map(r => old.find(o => o.id === r.id && o.status === "acked") ?? r));
         setOnline(true); setLoaded(true); setLastUpdate(new Date());
       } catch { if (!stopped) { setOnline(false); setLoaded(true); } }
@@ -71,7 +61,7 @@ export default function RequestInbox({ beacon = false }: { beacon?: boolean }) {
     };
     void poll();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [client, key]);
+  }, [client]);
   useEffect(() => {
     let stopped = false;
     void client.feedbackHistory().then(rows => { if (!stopped) setVotes(rows); }).catch(() => { /* Feedback must never block the live inbox. */ });
@@ -98,8 +88,7 @@ export default function RequestInbox({ beacon = false }: { beacon?: boolean }) {
       })} />;
   return <section id={beacon ? undefined : "requests"} className={`request-inbox ${beacon ? "beacon-inbox" : ""}`} aria-label="Live requests">
     <div className="request-heading"><div><p className="cg-eyebrow">{beacon ? "LIVE REQUESTS" : "01 / LIVE REQUESTS"}</p><h2>{open.length ? `${open.length} waiting for help` : "Waiting for requests"}</h2></div>
-      <div className="request-tools">{!beacon && <div className="request-count"><strong>{String(open.length).padStart(2, "0")}</strong><span>WAITING</span></div>}
-        <button className="cg-button cg-secondary" onClick={() => { sounds.unlock(); soundRef.current = !soundRef.current; setSound(soundRef.current); }}>{sound ? "Mute alerts" : "Enable alert sound"}</button></div></div>
+      {!beacon && <div className="request-count"><strong>{String(open.length).padStart(2, "0")}</strong><span>WAITING</span></div>}</div>
     <p className={`connection ${online ? "connected" : "disconnected"}`} role="status">{!loaded ? "Connecting…" : online ? "Connected · checking every second" : "Connection lost · requests may be out of date"}{lastUpdate && ` · last update ${lastUpdate.toLocaleTimeString()}`}</p>
     {error && <p className="cg-message cg-error" role="alert">{error}</p>}
     <div className="request-list">{(beacon ? [...open, ...answered] : open).map(renderRequest)}</div>

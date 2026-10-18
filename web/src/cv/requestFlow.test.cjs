@@ -10,16 +10,30 @@ const memory = () => {
 };
 const rest = { label: 'neutral', confidence: 1 };
 const water = { label: 'water', confidence: 1 };
-function setup(storage = memory()) {
+function setup(storage = memory(), browserAudio = true) {
   let now = 1000, creates = [], gets = [], words = [];
   let request = { id: 'r_1', label: 'water', status: 'open', speech: 'Water please' };
   const client = { create: async body => { creates.push(body); return request; }, get: async id => { gets.push(id); return request; } };
-  const flow = createRequestFlow(client, 'test', { storage, now: () => now, speak: word => words.push(word) });
+  const flow = createRequestFlow(client, 'test', { storage, now: () => now,
+    ...(browserAudio ? { speak: word => words.push(word) } : {}) });
   const observe = (prediction, time) => { now = time; flow.observe(prediction, time); };
   return { flow, client, storage, creates, gets, words, observe,
     ack: () => { request = { ...request, status: 'acked' }; }, setTime: time => { now = time; } };
 }
 function release(t, start) { for (let time = start; time <= start + 600; time += 100) t.observe(rest, time); }
+
+test('external-speaker mode completes delivery, acknowledgement and release without browser audio', async () => {
+  const t = setup(memory(), false);
+  release(t, 1000);
+  await t.flow.fire('water', .9);
+  assert.equal(t.flow.snapshot().phase, 'waiting_ack');
+  t.ack(); t.setTime(3000); await t.flow.poll();
+  assert.equal(t.flow.snapshot().phase, 'acknowledged');
+  t.setTime(11000); await t.flow.poll(); release(t, 11000);
+  assert.equal(t.flow.snapshot().phase, 'ready');
+  assert.equal(t.creates.length, 1);
+  assert.deepEqual(t.words, []);
+});
 
 test('three full cycles return to ready without patient buttons; held pose never resends', async () => {
   const t = setup();

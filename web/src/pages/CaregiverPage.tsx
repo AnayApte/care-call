@@ -6,6 +6,7 @@ import { displayWord } from "../lib/labels";
 import { LABELS } from "../cv/types";
 import ReportSummary from "../components/ReportSummary";
 import RequestInbox from "../components/RequestInbox";
+import Brand from "../components/Brand";
 import "./caregiver.css";
 import "./dashboard.css";
 
@@ -123,7 +124,7 @@ export default function CaregiverPage() {
   const maxAttempts = Math.max(1, ...totals.map(t => t.attempts));
   return <main className="caregiver dashboard">
     <header className="cg-header">
-      <a href="/caregiver" className="cg-brand"><span className="dash-brand-mark" aria-hidden="true">✳</span>CARE CALL<span className="dash-view"> / CAREGIVER</span></a>
+      <a href="/caregiver" className="brand-link" aria-label="Beacon caregiver dashboard"><Brand view="Caregiver" /></a>
       <nav className="dash-nav" aria-label="Dashboard sections"><a href="#requests"><span>01</span> Requests</a><a href="#usage"><span>02</span> Usage</a><a href="#review"><span>03</span> Review</a></nav>
       <a href="/patient" className="dash-patient-link">Patient screen <span aria-hidden="true">↗</span></a>
     </header>
@@ -139,7 +140,8 @@ export default function CaregiverPage() {
             <path d="M9-3 49-26H407L369-3Z" fill="url(#dash-hatch)" />
             <path d="M372 0 421-29V66L372 95Z" fill="#151515" stroke="#ededed" strokeWidth=".8" />
             <path d="M0 0H372V95H0Z" fill="#080808" stroke="#ededed" strokeWidth="1" />
-            <text x="24" y="64" fill="#f2f2f2" fontFamily="Arial, sans-serif" fontSize="51" letterSpacing="-3">CARE CALL</text>
+            <image href="/beacon.svg" x="18" y="9" width="55" height="78" />
+            <text x="87" y="64" fill="#f2f2f2" fontFamily="Arial, sans-serif" fontSize="54" letterSpacing="-3">BEACON</text>
             <path d="M330 32V63M314 47H346" stroke="#ededed" strokeWidth="1.5" />
           </g>
           <path d="M26 208H494" stroke="#555" strokeWidth=".5" />
@@ -186,6 +188,6 @@ export default function CaregiverPage() {
       </section>
     </div>
     {lastReport && <ReportSummary report={lastReport} open={summaryOpen} onClose={() => setSummaryOpen(false)} />}
-    <footer className="cg-footer"><span>CARE CALL / CAREGIVER</span><span>Assistive prototype. This does not diagnose or rule out stroke.</span><a href="#requests">Back to requests ↑</a></footer>
+    <footer className="cg-footer"><span>BEACON / CAREGIVER</span><span>Assistive prototype. This does not diagnose or rule out stroke.</span><a href="#requests">Back to requests ↑</a></footer>
   </main>;
 }

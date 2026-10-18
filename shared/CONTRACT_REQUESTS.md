@@ -36,3 +36,5 @@ Format: `YYYY-MM-DD HH:MM | name | what you need changed | why`
 2026-10-18 | josh | Josh requested a dashboard redesign inspired by Hello from Here. Updated the caregiver layout, request history and report styling on josh/dashboard-design. This request authorizes these web edits.
 
 2026-10-18 | josh | Josh also requested matching patient fonts and buttons, with Caregiver screen at the top. Added patient styling and grouped its controls; camera and gesture logic are unchanged.
+
+2026-10-18 | josh | Josh renamed the app Beacon and requested a lighthouse logo and no website audio. Authorized web branding and audio changes. The browser keeps visual request/acknowledgement; external speaker code and stored data keys stay unchanged. Josh also requested investigation of the training-save error.
