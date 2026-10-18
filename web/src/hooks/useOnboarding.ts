@@ -147,7 +147,8 @@ export function useOnboarding(videoRef: React.RefObject<HTMLVideoElement | null>
     patch({ flow: next, result: s.result, ...(!next.input ? { feedback: null } : {}) });
   }), [flow, patch]);
   useEffect(() => {
-    const poll = () => { void flow.poll(); };
+    // An unconfirmed send (including one restored after a reload) retries itself; the server dedupes by client_request_id.
+    const poll = () => { if (flow.snapshot().phase === "delivery_unknown") void flow.retry(); else void flow.poll(); };
     poll();
     const timer = window.setInterval(poll, 1000);
     window.addEventListener("online", poll);

@@ -9,6 +9,7 @@ import { USE_MOCK_HAND } from "@/lib/cv";
 import { CameraSelect } from "@/components/patient/CameraSelect";
 import { AddWordDialog } from "@/components/patient/AddWordDialog";
 import { loadCameraId } from "@/lib/cameraPref";
+import { LAPTOP_WEBCAM, PI_CAMERA } from "@/lib/cameraSource";
 import Brand from "@/components/Brand";
 import "@/components/patient/patient.css";
 import "@/components/patient/patient-theme.css";
@@ -65,8 +66,9 @@ export default function PatientPage() {
   return (
     <main className="patient-design relative h-full overflow-hidden" onClick={onScreenClick}>
       <div className={`cam-frame ${phase === "done" ? "dim" : ""}`}>
-        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" hidden={cameraId === "pi-usb"} />
-        {cameraId === "pi-usb" && <img className="pi-cam-preview" src="/camera.mjpg" alt="Pi USB camera preview" />}
+        <video ref={videoRef} muted playsInline aria-label="Camera preview, mirrored" hidden={cameraId === PI_CAMERA} />
+        {/* No Pi stream here (e.g. Vercel or local preview): fall back to the laptop webcam for this visit. */}
+        {cameraId === PI_CAMERA && <img className="pi-cam-preview" src="/camera.mjpg" alt="Pi USB camera preview" onError={() => setCameraId(LAPTOP_WEBCAM)} />}
         <HandCanvas ref={canvasRef} />
       </div>
       <div className="patient-toolbar">
@@ -92,7 +94,7 @@ export default function PatientPage() {
         )}
       </div>
       {state.cameraError && <div className="patient-warning" role="alert">{state.cameraError} <button type="button" onClick={reloadCamera}>Reload camera</button></div>}
-      {flow.error && <div className="patient-warning delivery-warning" role="alert">{flow.error}
+      {(flow.error || flow.phase === "delivery_unknown") && <div className="patient-warning delivery-warning" role="alert">{flow.error || "Checking that the request reached the caregiver…"}
         {(flow.phase === "delivery_unknown" || flow.phase === "failed") && <button type="button" onClick={() => { void retryRequest(); }}>Retry same request</button>}
         {flow.phase === "waiting_ack" && <button type="button" onClick={() => { void checkRequest(); }}>Check for help</button>}
         {flow.phase === "failed" && <button type="button" onClick={dismiss}>Return to listening</button>}
