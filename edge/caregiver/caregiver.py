@@ -117,11 +117,19 @@ def main():
     lcd = Lcd()
     button = Button(BUTTON_PIN, bounce_time=0.05)
     buzzer = Buzzer(BUZZER_PIN)
-    shown = {"key": None}
+    shown = {"key": None, "request_id": None}
+    shown_lock = threading.Lock()
 
     def press():
+        with shown_lock:
+            request_id = shown["request_id"]
+        if not request_id:
+            print("[button] ignored: no alert is currently displayed")
+            return
         lcd.show("Sending...", "")
-        code, _ = call("POST", "/api/device/ack", {"device_id": DEVICE_ID})
+        # Target the request currently shown on the LCD. If another request arrives
+        # between the poll and button press, never acknowledge that newer request.
+        code, _ = call("POST", "/api/device/ack", {"device_id": DEVICE_ID, "request_id": request_id})
         print(f"[button] ack -> {code}" + (" (nothing open)" if code == 409 else ""))
         buzzer.off()
 
@@ -146,23 +154,33 @@ def main():
             mode = state["mode"]
             active = state.get("active_request") or {}
             key = (mode, active.get("id"))
-            if key != shown["key"]:
+            with shown_lock:
+                changed = key != shown["key"]
                 shown["key"] = key
+            if changed:
                 if mode == "alert":
                     lcd.color(*RED)
                     lcd.show(active.get("display", "Help").upper(), "Press to answer")
                     buzzer.beep(on_time=0.3, off_time=0.7, background=True)
+                    with shown_lock:
+                        shown["request_id"] = active.get("id")
                 elif mode == "acked":
                     buzzer.off()
                     lcd.color(*GREEN)
                     lcd.show(state.get("message") or "On the way", active.get("display", ""))
+                    with shown_lock:
+                        shown["request_id"] = None
                 else:
                     buzzer.off()
                     lcd.color(*DIM)
                     lcd.show("Ready", "Care Call")
+                    with shown_lock:
+                        shown["request_id"] = None
         except Exception as exc:
             if shown["key"] != "offline":
-                shown["key"] = "offline"
+                with shown_lock:
+                    shown["key"] = "offline"
+                    shown["request_id"] = None
                 buzzer.off()
                 lcd.color(*AMBER)
                 lcd.show("OFFLINE", "Retrying...")
