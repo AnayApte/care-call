@@ -92,7 +92,7 @@ export default function PatientPage() {
             <div className="feedback" onClick={(e) => e.stopPropagation()} role="group" aria-label="Was that right">
               {feedback === "asking" ? (
                 <>
-                  <p>Was that the right request?</p>
+                  <p>Caregiver check: was that right?</p>
                   <div className="row">
                     <button type="button" className="fb yes" onClick={feedbackYes}>Yes</button>
                     <button type="button" className="fb" onClick={feedbackNo}>No</button>
