@@ -37,6 +37,7 @@ DEVICE_ID = os.environ.get("DEVICE_ID", "bedside_1")
 PHRASE = "Help is coming."
 CLIPS = Path.home() / ".carecall"
 SPEAK_REQUESTS = os.environ.get("SPEAK_REQUESTS", "true").lower() == "true"
+AUDIO_FORMAT = os.environ.get("AUDIO_FORMAT", "mp3")  # "wav" on QNX (its "wave" player cannot decode MP3)
 
 
 def call(method, path, body=None, timeout=10):
@@ -50,12 +51,12 @@ def call(method, path, body=None, timeout=10):
 def clip_for(text: str):
     """Download the ElevenLabs clip for `text` once and keep it on the Pi. Returns the path or None."""
     import hashlib
-    path = CLIPS / (hashlib.sha256(text.encode()).hexdigest()[:16] + ".mp3")
+    path = CLIPS / (hashlib.sha256(text.encode()).hexdigest()[:16] + "." + AUDIO_FORMAT)
     if path.exists() and path.stat().st_size > 1000:
         return path
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(call("POST", "/api/tts", {"text": text}, timeout=30))
+        path.write_bytes(call("POST", "/api/tts", {"text": text, "format": AUDIO_FORMAT}, timeout=30))
         print(f"[bedside] saved clip for {text!r}")
         return path
     except Exception as exc:
@@ -64,7 +65,7 @@ def clip_for(text: str):
 
 
 def speak(text: str = PHRASE) -> None:
-    player = os.environ.get("PLAYER") or next((p for p in ("mpg123", "ffplay", "cvlc") if shutil.which(p)), None)
+    player = os.environ.get("PLAYER") or next((p for p in ("mpg123", "ffplay", "cvlc", "wave", "aplay") if shutil.which(p)), None)
     clip = clip_for(text)
     if clip and player:
         args = {"mpg123": ["mpg123", "-q"], "ffplay": ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"],

@@ -77,6 +77,7 @@ class HeartbeatIn(BaseModel):
 
 class TtsIn(BaseModel):
     text: str = Field(min_length=1, max_length=500)
+    format: Literal["mp3", "wav"] = "mp3"  # wav for players that cannot decode MP3 (QNX)
 
 
 class FeedbackIn(BaseModel):

@@ -13,10 +13,11 @@ router = APIRouter()
 def tts(body: TtsIn):
     """MP3 for the bedside speaker. Cached, so repeat phrases are instant and free."""
     try:
-        audio = tts_engine.speak(body.text)
+        audio = tts_engine.speak(body.text, body.format)
     except tts_engine.TtsError as exc:
         raise HTTPException(exc.status, str(exc))
-    return Response(audio, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=86400"})
+    media = "audio/wav" if body.format == "wav" else "audio/mpeg"
+    return Response(audio, media_type=media, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/api/benchmark")
