@@ -12,16 +12,47 @@ export function createSampleQueue(base: string, patientId: string, storage?: Loc
   let pending: Batch[] = [];
   let inFlight: Promise<void> | null = null;
   let storageFailed = false;
+  const migratedKeys: string[] = [];
+  const readQueue = (storageKey: string): { cached: Sample[]; pending: Batch[] } => {
+    try {
+      const raw = JSON.parse(storage?.getItem(storageKey) ?? "null");
+      return {
+        cached: Array.isArray(raw?.cached) ? raw.cached.filter((s: Sample) => isLabel(s?.label) && validVector(s.vector)) : [],
+        pending: Array.isArray(raw?.pending) ? raw.pending.filter((b: Batch) => isLabel(b?.label) &&
+          Array.isArray(b.vectors) && b.vectors.length === 15 && b.vectors.every(validVector) && typeof b.trainingKey === "string") : [],
+      };
+    } catch { return { cached: [] as Sample[], pending: [] as Batch[] }; }
+  };
   try {
-    const raw = JSON.parse(storage?.getItem(key) ?? "null");
-    cached = Array.isArray(raw?.cached) ? raw.cached.filter((s: Sample) => isLabel(s?.label) && validVector(s.vector)) : [];
-    pending = Array.isArray(raw?.pending) ? raw.pending.filter((b: Batch) => isLabel(b?.label) &&
-      Array.isArray(b.vectors) && b.vectors.length === 15 && b.vectors.every(validVector) && typeof b.trainingKey === "string") : [];
+    const current = readQueue(key);
+    cached = current.cached;
+    pending = current.pending;
+    // Recover batches saved by builds that mistakenly used the Mac's localhost API.
+    for (const oldBase of ["http://localhost:8000", "http://127.0.0.1:8000"]) {
+      const oldKey = `carecall:samples-v2:${oldBase}:${patientId}`;
+      if (oldKey === key || !storage?.getItem(oldKey)) continue;
+      const old = readQueue(oldKey);
+      if (!old.cached.length && !old.pending.length) continue;
+      cached = [...old.cached, ...cached];
+      pending = [...old.pending.filter(batch => !pending.some(currentBatch => currentBatch.label === batch.label)), ...pending];
+      migratedKeys.push(oldKey);
+    }
   } catch { /* No valid cache yet. */ }
   const persist = () => {
-    try { storage?.setItem(key, JSON.stringify({ cached, pending })); }
+    try {
+      if (!storage) return false;
+      storage.setItem(key, JSON.stringify({ cached, pending }));
+      storageFailed = false;
+      return true;
+    }
     catch { storageFailed = true; }
+    return false;
   };
+  if (migratedKeys.length && persist()) {
+    for (const oldKey of migratedKeys) {
+      try { storage?.removeItem(oldKey); } catch { /* Keep the migrated copy if cleanup fails. */ }
+    }
+  }
   return {
     load(serverSamples?: Sample[]) {
       let merged = serverSamples ?? cached;

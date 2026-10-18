@@ -205,3 +205,23 @@ test('training errors explain a rejection or timeout and keep the batch for retr
     assert.equal(createSampleQueue('http://test', 'p_demo', storage).pendingCount(), 1);
   } finally { global.fetch = original; }
 });
+
+test('training saved against localhost migrates and retries against the configured server', async () => {
+  const original = global.fetch, storage = memory();
+  const vectors = Array.from({ length: 15 }, (_, i) => Array(42).fill(i));
+  const oldKey = 'carecall:samples-v2:http://localhost:8000:p_demo';
+  const base = 'https://care-call-production.up.railway.app';
+  storage.setItem(oldKey, JSON.stringify({ cached: [], pending: [{ label: 'pain', vectors, trainingKey: 'config-1' }] }));
+  const queue = createSampleQueue(base, 'p_demo', storage);
+  assert.equal(queue.load().filter(sample => sample.label === 'pain').length, 15);
+  assert.equal(storage.getItem(oldKey), null);
+  global.fetch = async (url, init) => {
+    assert.equal(url, `${base}/api/patients/p_demo/samples/pain`);
+    assert.equal(init.method, 'PUT');
+    assert.deepEqual(JSON.parse(init.body), { vectors });
+    return { ok: true };
+  };
+  try { await queue.flush(); }
+  finally { global.fetch = original; }
+  assert.equal(queue.pendingCount(), 0);
+});

@@ -54,6 +54,11 @@ class SoftwareV2(unittest.TestCase):
         url = "/api/device/ack"
         ack = self.client.post(url, headers=headers, json={"device_id": "caregiver_1", "request_id": first["id"]}).json()
         self.assertEqual(ack["id"], first["id"])
+        self.assertEqual(self.client.get(f"/api/requests/{first['id']}").json()["status"], "acked")
+        state = self.client.get("/api/device/state?device_id=bedside_1", headers=headers).json()
+        self.assertEqual(state["mode"], "acked")
+        self.assertEqual(state["last_ack"]["request_id"], first["id"])
+        self.assertEqual(state["last_ack"]["acked_by"], "button")
         self.assertEqual(store.get_request(second["id"])["status"], "open")
         self.assertEqual(self.client.post(url, headers=headers, json={"device_id": "caregiver_1", "request_id": first["id"]}).json(), ack)
         self.assertEqual(self.client.post(url, headers=headers, json={"device_id": "caregiver_1", "request_id": "r_9999"}).status_code, 404)
